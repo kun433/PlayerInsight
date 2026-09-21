@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-20",
+  "generatedAt": "2026-09-20 22:12:31",
+  "playerCount": 1,
+  "players": [
+    {
+      "player": "MC_Yeko",
+      "uuid": "a4b7cac0-81d1-3d0a-8797-5eb68a2e4d1f",
+      "onlineSeconds": 5476,
+      "sessions": 2,
+      "distanceBlocks": 30.05,
+      "blocksBroken": 2,
+      "oresMined": 0,
+      "blocksPlaced": 1,
+      "itemsPickedUp": 2,
+      "itemsCrafted": 0,
+      "containersOpened": 0,
+      "deaths": 0,
+      "playerKills": 0,
+      "mobKills": 0,
+      "chatMessages": 0,
+      "commands": 1,
+      "pvpEvents": 0,
+      "minedBlocks": {
+        "GRASS": 2
+      }
+    }
+  ]
+}

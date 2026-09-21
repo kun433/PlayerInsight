@@ -1,0 +1,137 @@
+{
+  "player": "MC_Yeko",
+  "uuid": "a4b7cac0-81d1-3d0a-8797-5eb68a2e4d1f",
+  "month": "2026-09",
+  "monthStart": "2026-09-01",
+  "monthEnd": "2026-09-30",
+  "generatedAt": "2026-09-20 22:12:31",
+  "firstEventAt": "2026-09-17 20:43:32",
+  "lastEventAt": "2026-09-17 21:17:00",
+  "online": {
+    "seconds": 5476,
+    "hours": 1.52,
+    "sessions": 2,
+    "longestSessionSeconds": 791,
+    "kicks": 0,
+    "ips": [
+      "127.0.0.1"
+    ],
+    "clients": []
+  },
+  "movement": {
+    "samples": 164,
+    "distanceBlocks": 30.05,
+    "byMode": {
+      "unknown": 30.05
+    },
+    "byWorld": {
+      "world": 30.05
+    },
+    "byDimension": {
+      "NORMAL": 30.05
+    },
+    "biomes": {},
+    "standingOn": {}
+  },
+  "blocks": {
+    "broken": 2,
+    "placed": 1,
+    "minedByMaterial": {
+      "GRASS": 2
+    },
+    "placedByMaterial": {
+      "DIRT": 1
+    },
+    "toolsUsed": {},
+    "minedByWorld": {
+      "?": 2
+    },
+    "ores": {
+      "total": 0,
+      "belowY16": 0,
+      "belowY0": 0,
+      "atNight": 0,
+      "chunks": 0,
+      "byMaterial": {}
+    },
+    "breakYHistogram": {}
+  },
+  "items": {
+    "pickedUp": 2,
+    "dropped": 0,
+    "consumed": 0,
+    "crafted": 0,
+    "enchanted": 0,
+    "anvilUses": 0,
+    "brewed": 0,
+    "fished": 0,
+    "sheared": 0,
+    "bred": 0,
+    "tamed": 0,
+    "milked": 0,
+    "bucketFilled": 0,
+    "bucketEmptied": 0,
+    "toolsBroken": 0,
+    "toolDamage": 0,
+    "pickupByMaterial": {
+      "DIRT": 2
+    },
+    "craftByMaterial": {},
+    "smeltByMaterial": {},
+    "enchantByMaterial": {},
+    "consumeByMaterial": {},
+    "dropByMaterial": {},
+    "fishByMaterial": {}
+  },
+  "containers": {
+    "opened": 0,
+    "distinctLocations": 0,
+    "byType": {}
+  },
+  "combat": {
+    "deaths": 0,
+    "playerKills": 0,
+    "pvpEvents": 0,
+    "pvpDamageDealt": 0.0,
+    "pvpDamageTaken": 0.0,
+    "damageTaken": 0.0,
+    "deathCauses": {},
+    "damageSources": {},
+    "mobKills": {}
+  },
+  "chat": {
+    "messages": 0,
+    "characters": 0,
+    "topWords": {}
+  },
+  "commands": {
+    "total": 1,
+    "adminCommands": 0,
+    "topCommands": {
+      "reg": 1
+    }
+  },
+  "worlds": {
+    "worlds": {},
+    "dimensions": {},
+    "worldChanges": 0,
+    "teleports": 0,
+    "portals": 0,
+    "sleeps": 0,
+    "gamemodeChanges": 0,
+    "ignites": 0
+  },
+  "advancements": [],
+  "lifetimeStatistics": {
+    "snapshotAt": "",
+    "playtimeTicks": 0,
+    "playtimeHours": 0.0,
+    "values": {}
+  },
+  "eventCounts": {
+    "SESSION": 4,
+    "MOVE": 164,
+    "COMMAND": 1,
+    "BLOCK": 5
+  }
+}

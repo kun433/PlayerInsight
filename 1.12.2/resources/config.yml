@@ -1,0 +1,97 @@
+# =====================================================================
+# PlayerInsight 配置文件
+# 记录玩家行为并生成清晰的行为报告（Markdown / JSON / CSV）。
+# 所有记录都是“事件回放”式的：原始日志在 data/<uuid>/<yyyy-MM>.jsonl，
+# 报告只是对原始日志的重新聚合，随时可以用 /pi gen 重新生成。
+# =====================================================================
+
+# ===== 自动报告 =====
+# 每天自动生成“全部玩家日报”。
+auto-daily-report: true
+# 每月结束时自动生成每个玩家的月度报告。
+auto-monthly-report: true
+
+# 每个玩家“每 N 天一份记录”的快照文件。
+player-record:
+  enabled: true
+  # 每多少天生成一份玩家记录（记录区间为最近 N 天）。
+  interval-days: 3
+
+# 多久检查一次（分钟）：是否跨天、是否需要生成自动报告。
+check-interval-minutes: 30
+
+# ===== 记录哪些类别 =====
+# 关掉某一项后，该类事件不再写入原始日志（该类别在报告中也会为空）。
+record:
+  # 移动轨迹：位置、朝向、位移距离、移动方式（行走/疾跑/游泳/鞘翅/船/矿车/骑马）、群系、脚下方块、亮度
+  movement: true
+  # 聊天内容
+  chat: true
+  # 玩家执行的指令（含管理类指令审计）
+  commands: true
+  # 战斗：死亡（含死因/凶手/坐标/掉落物/装备）、击杀玩家、击杀怪物、PvP
+  combat: true
+  # 方块：破坏 / 放置（含材质、坐标、工具、方块状态、亮度、矿物标记）
+  blocks: true
+  # 世界切换、传送、传送门
+  worlds: true
+  # 物品：拾取 / 丢弃 / 食用 / 工具磨损与损坏
+  items: true
+  # 容器：箱子 / 熔炉 / 末影箱等打开记录（类型 + 坐标）
+  containers: true
+  # 生产：合成 / 熔炼 / 附魔 / 铁砧 / 酿造
+  crafting: true
+  # 农牧渔：钓鱼 / 剪羊毛 / 繁殖 / 驯服 / 装桶倒桶
+  farming: true
+  # 成就达成
+  advancements: true
+  # 登录登出、睡觉、游戏模式切换、等级变化
+  sessions: true
+  # 服务器原生统计快照（Minecraft 自带的历史累计数据，登录/登出时抓取）
+  statistics: true
+  # 玩家受到非玩家伤害时记录一条 DAMAGE_TAKEN（战斗频繁时数据量较大，可关闭）
+  damage: true
+  # 村民交易（从商人界面取出结果物品）
+  trading: true
+  # 抛射物发射（箭 / 三叉戟 / 末影珍珠 / 雪球 / 药水等）
+  projectiles: true
+  # 玩家下线时的状态快照（等级/生命/饱食/位置/手持/装备/背包统计）
+  snapshots: true
+
+# ===== 战斗汇总 =====
+# 把一段时间内的命中/伤害汇总成一条 COMBAT 事件（避免一次战斗写几百条日志）。
+combat-summary:
+  interval-seconds: 60
+
+# ===== 报告 =====
+report:
+  # 月度报告里生成“逐日明细”表（需要对当月日志再按天聚合一次）
+  per-day-detail: true
+
+# ===== 方块记录明细粒度 =====
+# 关掉这些开关只会让日志更小，不会影响“挖了多少个方块”的统计。
+block-detail:
+  # 记录精确坐标（x/y/z）
+  coordinates: true
+  # 记录 Y 层分布（用于挖掘高度分析和深层矿物判断）
+  y-histogram: true
+  # 记录当时手持的工具
+  tool: true
+  # 记录方块状态（1.12.2 为 data 值，1.13+ 为方块状态字符串，如 facing / age）
+  block-state: true
+  # 记录方块光照等级
+  light: true
+
+# ===== 移动采样 =====
+move-log:
+  # 每隔多少秒记录一次位置（无论中途移动了多少格）
+  interval-seconds: 5
+  # true = 只在确实发生位移时写一条 MOVE 事件（推荐，避免大量静止噪声）
+  only-when-moved: true
+
+# ===== 导出 =====
+export:
+  # 生成机器可读的 JSON 汇总（便于 AI / 脚本消费）
+  json: true
+  # 生成 CSV（便于 Excel 排序与统计）
+  csv: true

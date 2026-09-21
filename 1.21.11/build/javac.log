@@ -1,0 +1,18 @@
+﻿javac.exe : C:\Users\zpst1\.proma\agent-workspaces\default\workspace-files\PlayerInsight\1.21.11\src\com\playerinsight\
+PlayerInsight.java:555: ����: [removal] OldEnum �е� name() �ѹ�ʱ, �ұ��Ϊ��ɾ��
+所在位置 C:\Users\zpst1\.proma\agent-workspaces\default\workspace-files\PlayerInsight\tests\build-both.ps1:20 字符: 17
++ ... $javacOut = & $javac --release $(if ($base -like "*1.21.11") { 21 } e ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\zpst1\...ѹ�ʱ, �ұ��Ϊ��ɾ��:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+            o.addProperty("biome", loc.getBlock().getBiome().name());
+                                                            ^
+C:\Users\zpst1\.proma\agent-workspaces\default\workspace-files\PlayerInsight\1.21.11\src\com\playerinsight\PlayerInsigh
+t.java:903: ����: [removal] Enchantment �е� getName() �ѹ�ʱ, �ұ��Ϊ��ɾ��
+                    note.append(entry.getKey().getName()).append(" ").append(entry.getValue());
+                                              ^
+ע: ĳЩ�����ļ�ʹ�û򸲸����ѹ�ʱ�� API��
+ע: �й���ϸ��Ϣ, ��ʹ�� -Xlint:deprecation ���±��롣
+2 ������
+

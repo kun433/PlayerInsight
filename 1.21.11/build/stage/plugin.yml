@@ -1,0 +1,16 @@
+name: PlayerInsight
+main: com.playerinsight.PlayerInsight
+version: 1.21.11-4
+api-version: "1.21"
+description: 详细记录玩家行为（挖掘/放置/物品/战斗/容器/成就等）并生成月度 Markdown/JSON/CSV 报告，供人工核查与 AI 分析使用。
+author: PlayerInsight
+commands:
+  playerinsight:
+    description: 生成玩家行为报告。
+    usage: /playerinsight report <玩家> | month <玩家> <yyyy-MM> | day <玩家> [yyyy-MM-dd] | blocks <玩家> [today|month|yyyy-MM] | stats [玩家] | gen <daily|monthly|records> | reload
+    aliases: [pi]
+    permission: playerinsight.use
+permissions:
+  playerinsight.use:
+    description: 允许生成与查看报告。
+    default: op

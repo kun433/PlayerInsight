@@ -1,0 +1,215 @@
+{
+  "player": "Steve_CN",
+  "uuid": "11111111-2222-3333-4444-555555555555",
+  "month": "2026-09",
+  "monthStart": "2026-09-01",
+  "monthEnd": "2026-09-30",
+  "generatedAt": "2026-09-20 22:12:30",
+  "firstEventAt": "2025-09-16 13:20:00",
+  "lastEventAt": "2025-09-16 13:27:10",
+  "online": {
+    "seconds": 430,
+    "hours": 0.12,
+    "sessions": 1,
+    "longestSessionSeconds": 430,
+    "kicks": 0,
+    "ips": [
+      "10.0.0.7"
+    ],
+    "clients": [
+      "vanilla"
+    ]
+  },
+  "movement": {
+    "samples": 2,
+    "distanceBlocks": 18.3,
+    "byMode": {
+      "疾跑": 15.2,
+      "游泳": 3.1
+    },
+    "byWorld": {
+      "world": 18.3
+    },
+    "byDimension": {
+      "主世界": 18.3
+    },
+    "biomes": {
+      "PLAINS": 2
+    },
+    "standingOn": {
+      "GRASS": 1,
+      "WATER": 1
+    }
+  },
+  "blocks": {
+    "broken": 3,
+    "placed": 1,
+    "minedByMaterial": {
+      "DIAMOND_ORE": 2,
+      "STONE": 1
+    },
+    "placedByMaterial": {
+      "TORCH": 1
+    },
+    "toolsUsed": {
+      "IRON_PICKAXE": 3
+    },
+    "minedByWorld": {
+      "world": 3
+    },
+    "ores": {
+      "total": 2,
+      "belowY16": 2,
+      "belowY0": 2,
+      "atNight": 0,
+      "chunks": 1,
+      "byMaterial": {
+        "DIAMOND_ORE": 2
+      }
+    },
+    "breakYHistogram": {
+      "-53": 1,
+      "-52": 1,
+      "-50": 1
+    }
+  },
+  "items": {
+    "pickedUp": 4,
+    "dropped": 0,
+    "consumed": 1,
+    "crafted": 1,
+    "enchanted": 1,
+    "anvilUses": 0,
+    "brewed": 0,
+    "fished": 1,
+    "sheared": 0,
+    "bred": 0,
+    "tamed": 0,
+    "milked": 0,
+    "bucketFilled": 0,
+    "bucketEmptied": 0,
+    "toolsBroken": 0,
+    "toolDamage": 0,
+    "pickupByMaterial": {
+      "DIAMOND": 1
+    },
+    "craftByMaterial": {
+      "DIAMOND_PICKAXE": 1
+    },
+    "smeltByMaterial": {
+      "IRON_INGOT": 1
+    },
+    "enchantByMaterial": {
+      "DIAMOND_PICKAXE": 1
+    },
+    "consumeByMaterial": {
+      "COOKED_BEEF": 1
+    },
+    "dropByMaterial": {},
+    "fishByMaterial": {
+      "FISHING_ROD": 1
+    }
+  },
+  "containers": {
+    "opened": 2,
+    "distinctLocations": 1,
+    "byType": {
+      "CHEST": 1,
+      "ENDER_CHEST": 1
+    }
+  },
+  "combat": {
+    "deaths": 1,
+    "playerKills": 1,
+    "pvpEvents": 2,
+    "pvpDamageDealt": 13.0,
+    "pvpDamageTaken": 0.0,
+    "damageTaken": 2.0,
+    "deathCauses": {
+      "ENTITY_ATTACK": 1
+    },
+    "damageSources": {
+      "ENTITY_ATTACK": 1
+    },
+    "mobKills": {
+      "CREEPER": 1,
+      "ZOMBIE": 1
+    }
+  },
+  "chat": {
+    "messages": 1,
+    "characters": 11,
+    "topWords": {
+      "今天": 1,
+      "今天挖到钻石了": 1,
+      "到钻": 1,
+      "天挖": 1,
+      "好开": 1,
+      "好开心": 1,
+      "开心": 1,
+      "挖到": 1,
+      "石了": 1,
+      "钻石": 1
+    }
+  },
+  "commands": {
+    "total": 2,
+    "adminCommands": 1,
+    "topCommands": {
+      "gamemode": 1,
+      "home": 1
+    }
+  },
+  "worlds": {
+    "worlds": {
+      "world_nether": 1
+    },
+    "dimensions": {
+      "下界": 1
+    },
+    "worldChanges": 1,
+    "teleports": 1,
+    "portals": 1,
+    "sleeps": 1,
+    "gamemodeChanges": 1,
+    "ignites": 1
+  },
+  "advancements": [
+    "[2025-09-16 13:25:00] minecraft:story/mine_diamond"
+  ],
+  "lifetimeStatistics": {
+    "snapshotAt": "2025-09-16 13:27:00",
+    "playtimeTicks": 7200000,
+    "playtimeHours": 100.0,
+    "values": {
+      "累计步行(格)": 12000,
+      "累计击杀怪物": 120,
+      "累计死亡": 3,
+      "累计挖到 DIAMOND_ORE": 45
+    }
+  },
+  "eventCounts": {
+    "SESSION": 2,
+    "MOVE": 2,
+    "BLOCK": 4,
+    "ITEM": 6,
+    "CONTAINER": 2,
+    "MOBKILL": 2,
+    "PVP": 2,
+    "KILL": 1,
+    "DAMAGE_TAKEN": 1,
+    "DEATH": 1,
+    "ADVANCEMENT": 1,
+    "SLEEP": 1,
+    "GAMEMODE": 1,
+    "LEVEL": 1,
+    "WORLD": 1,
+    "PORTAL": 1,
+    "TELEPORT": 1,
+    "IGNITE": 1,
+    "SIGN": 1,
+    "CHAT": 1,
+    "COMMAND": 2,
+    "STATS": 1
+  }
+}

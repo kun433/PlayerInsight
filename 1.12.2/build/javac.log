@@ -1,0 +1,9 @@
+﻿javac.exe : ע: ĳЩ�����ļ�ʹ�û򸲸����ѹ�ʱ�� API��
+所在位置 C:\Users\zpst1\.proma\agent-workspaces\default\workspace-files\PlayerInsight\tests\build-both.ps1:20 字符: 17
++ ... $javacOut = & $javac --release $(if ($base -like "*1.21.11") { 21 } e ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ע: ĳЩ�����ļ�ʹ�û򸲸����ѹ�ʱ�� API��:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ע: �й���ϸ��Ϣ, ��ʹ�� -Xlint:deprecation ���±��롣
+

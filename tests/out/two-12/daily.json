@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-17",
+  "generatedAt": "2026-09-21 19:09:07",
+  "playerCount": 2,
+  "players": [
+    {
+      "player": "MC_Yeko",
+      "uuid": "uuid-MC_Yeko",
+      "onlineSeconds": 876,
+      "sessions": 2,
+      "distanceBlocks": 30.05,
+      "blocksBroken": 2,
+      "oresMined": 0,
+      "blocksPlaced": 1,
+      "itemsPickedUp": 2,
+      "itemsCrafted": 0,
+      "containersOpened": 0,
+      "deaths": 0,
+      "playerKills": 0,
+      "mobKills": 0,
+      "chatMessages": 0,
+      "commands": 1,
+      "pvpEvents": 0,
+      "minedBlocks": {
+        "GRASS": 2
+      }
+    },
+    {
+      "player": "Alex_CN",
+      "uuid": "uuid-Alex_CN",
+      "onlineSeconds": 20,
+      "sessions": 1,
+      "distanceBlocks": 0.0,
+      "blocksBroken": 6,
+      "oresMined": 1,
+      "blocksPlaced": 0,
+      "itemsPickedUp": 0,
+      "itemsCrafted": 1,
+      "containersOpened": 1,
+      "deaths": 0,
+      "playerKills": 0,
+      "mobKills": 0,
+      "chatMessages": 1,
+      "commands": 1,
+      "pvpEvents": 0,
+      "minedBlocks": {
+        "STONE": 3,
+        "DIRT": 1,
+        "IRON_ORE": 1,
+        "OAK_LOG": 1
+      }
+    }
+  ]
+}

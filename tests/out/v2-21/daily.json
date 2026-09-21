@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-20",
+  "generatedAt": "2026-09-20 22:12:30",
+  "playerCount": 1,
+  "players": [
+    {
+      "player": "Steve_CN",
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "onlineSeconds": 430,
+      "sessions": 1,
+      "distanceBlocks": 18.3,
+      "blocksBroken": 3,
+      "oresMined": 2,
+      "blocksPlaced": 1,
+      "itemsPickedUp": 4,
+      "itemsCrafted": 1,
+      "containersOpened": 2,
+      "deaths": 1,
+      "playerKills": 1,
+      "mobKills": 2,
+      "chatMessages": 1,
+      "commands": 2,
+      "pvpEvents": 2,
+      "minedBlocks": {
+        "DIAMOND_ORE": 2,
+        "STONE": 1
+      }
+    }
+  ]
+}
