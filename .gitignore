@@ -1,0 +1,14 @@
+# 构建产物与本地依赖（第三方 jar 与重定位后的 Gson 不进版本库）
+build/
+dist/
+*.class
+.testserver/
+tests/out/
+
+# 依赖 jar（按 README「自己编译」一节自行准备）
+lib/*.jar
+shaded/
+
+# 服务器运行时数据
+trail/
+logs/

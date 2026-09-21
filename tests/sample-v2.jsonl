@@ -1,0 +1,36 @@
+{"dim":"主世界","y":61,"state":"JOIN","ping":38,"brand":"vanilla","name":"Steve_CN","type":"SESSION","z":258,"x":222,"gamemode":"SURVIVAL","t":1758000000000,"world":"world","ip":"10.0.0.7"}
+{"dim":"主世界","dist":15.2,"y":62,"biome":"PLAINS","mode":"疾跑","blockBelow":"GRASS","name":"Steve_CN","type":"MOVE","z":270.1,"x":230.5,"pitch":10,"t":1758000060000,"dark":false,"world":"world","light":12,"yaw":90}
+{"dim":"主世界","dist":3.1,"y":-14,"biome":"PLAINS","mode":"游泳","blockBelow":"WATER","name":"Steve_CN","type":"MOVE","z":271,"x":231,"pitch":45,"t":1758000120000,"dark":false,"world":"world","light":10,"yaw":180}
+{"dim":"主世界","blockData":"data=0","y":-52,"action":"BREAK","tool":"IRON_PICKAXE","name":"Steve_CN","type":"BLOCK","z":88,"x":128,"material":"DIAMOND_ORE","t":1758000130000,"ore":true,"world":"world","light":0}
+{"dim":"主世界","y":-53,"action":"BREAK","tool":"IRON_PICKAXE","name":"Steve_CN","type":"BLOCK","z":88,"x":129,"material":"DIAMOND_ORE","t":1758000131000,"ore":true,"world":"world","light":0}
+{"dim":"主世界","y":-50,"action":"BREAK","tool":"IRON_PICKAXE","name":"Steve_CN","type":"BLOCK","z":90,"x":130,"material":"STONE","t":1758000140000,"ore":false,"world":"world","light":0}
+{"x":130,"action":"PLACE","type":"BLOCK","world":"world","t":1758000150000,"material":"TORCH","name":"Steve_CN","y":-49,"dim":"主世界","z":90}
+{"x":128,"action":"PICKUP","type":"ITEM","world":"world","t":1758000160000,"material":"DIAMOND","name":"Steve_CN","z":88,"y":-52,"amount":4}
+{"x":128,"action":"CRAFT","type":"ITEM","world":"world","t":1758000170000,"material":"DIAMOND_PICKAXE","name":"Steve_CN","z":88,"y":64,"amount":1}
+{"x":128,"action":"CONSUME","type":"ITEM","world":"world","t":1758000180000,"material":"COOKED_BEEF","name":"Steve_CN","z":88,"y":64,"amount":1}
+{"x":128,"action":"ENCHANT","type":"ITEM","world":"world","t":1758000190000,"material":"DIAMOND_PICKAXE","name":"Steve_CN","z":88,"note":"花费等级=3 附魔=DIG_SPEED 3","y":64,"amount":1}
+{"x":120,"action":"SMELT","type":"ITEM","world":"world","t":1758000200000,"material":"IRON_INGOT","name":"Steve_CN","z":80,"y":64,"amount":5}
+{"x":200,"action":"FISH","type":"ITEM","world":"world","t":1758000210000,"material":"FISHING_ROD","name":"Steve_CN","z":300,"note":"钓到=RAW_FISH","y":63,"amount":1}
+{"x":222,"container":"CHEST","action":"OPEN","type":"CONTAINER","y":61,"t":1758000220000,"world":"world","name":"Steve_CN","title":"家里的箱子","z":258}
+{"x":222,"container":"ENDER_CHEST","action":"OPEN","type":"CONTAINER","y":61,"t":1758000230000,"world":"world","name":"Steve_CN","self":true,"title":"末影箱","z":258}
+{"x":150,"droppedExp":5,"type":"MOBKILL","y":40,"t":1758000240000,"world":"world","name":"Steve_CN","weapon":"DIAMOND_SWORD","entity":"ZOMBIE","z":150}
+{"x":160,"type":"MOBKILL","y":41,"t":1758000250000,"world":"world","name":"Steve_CN","weapon":"BOW","entity":"CREEPER","z":160}
+{"victim":"Alex_CN","attacker":"Steve_CN","type":"PVP","y":70,"t":1758000260000,"weapon":"DIAMOND_SWORD","world":"world","name":"Steve_CN","damage":6.5,"x":100,"victimHealthAfter":13.5,"z":100}
+{"victim":"Alex_CN","attacker":"Steve_CN","type":"PVP","y":70,"t":1758000261000,"weapon":"DIAMOND_SWORD","world":"world","name":"Alex_CN","damage":6.5,"x":100,"z":100}
+{"victim":"Alex_CN","type":"KILL","y":70,"t":1758000270000,"world":"world","name":"Steve_CN","weapon":"DIAMOND_SWORD","z":100,"x":100,"damage":9}
+{"source":"SKELETON","y":40,"type":"DAMAGE_TAKEN","cause":"ENTITY_ATTACK","t":1758000280000,"world":"world","name":"Steve_CN","damage":2,"x":150,"z":150}
+{"dim":"主世界","y":30,"level":27,"itemsLost":2,"cause":"ENTITY_ATTACK","name":"Steve_CN","type":"DEATH","z":150,"x":150,"killer":"","itemsLostTotal":35,"t":1758000290000,"items":"DIAMOND_PICKAXE x1, TORCH x34","world":"world","xpLost":120,"armor":"头盔=DIAMOND_HELMET, 胸甲=IRON_CHESTPLATE"}
+{"key":"minecraft:story/mine_diamond","t":1758000300000,"name":"Steve_CN","type":"ADVANCEMENT"}
+{"y":61,"action":"ENTER","name":"Steve_CN","type":"SLEEP","z":258,"x":222,"t":1758000310000,"world":"world"}
+{"from":"SURVIVAL","t":1758000320000,"name":"Steve_CN","to":"CREATIVE","type":"GAMEMODE"}
+{"name":"Steve_CN","t":1758000330000,"type":"LEVEL","totalExp":1500,"old":27,"new":30}
+{"x":10,"type":"WORLD","y":70,"t":1758000340000,"world":"world_nether","name":"Steve_CN","from":"world","dim":"下界","z":10}
+{"x":12,"fromZ":10,"type":"PORTAL","cause":"NETHER_PORTAL","t":1758000350000,"fromX":10,"name":"Steve_CN","fromWorld":"world","z":12,"y":70,"fromY":70,"world":"world_nether"}
+{"fromY":70,"y":61,"fromX":12,"distance":-1,"fromWorld":"world_nether","fromZ":12,"cause":"COMMAND","name":"Steve_CN","type":"TELEPORT","z":258,"x":222,"t":1758000360000,"world":"world"}
+{"x":20,"type":"IGNITE","cause":"FLINT_AND_STEEL","t":1758000370000,"material":"NETHERRACK","name":"Steve_CN","z":20,"y":70,"world":"world_nether"}
+{"y":61,"name":"Steve_CN","type":"SIGN","z":259,"x":223,"lines":"商店 / 钻石 1G","t":1758000380000,"world":"world"}
+{"y":61,"name":"Steve_CN","type":"CHAT","z":258,"x":222,"msg":"今天挖到钻石了 好开心","t":1758000390000,"world":"world"}
+{"x":222,"type":"COMMAND","cmd":"/home","t":1758000400000,"world":"world","name":"Steve_CN","z":258,"y":61,"base":"home"}
+{"x":222,"type":"COMMAND","cmd":"/gamemode survival","t":1758000410000,"world":"world","name":"Steve_CN","z":258,"y":61,"base":"gamemode"}
+{"snapshot":true,"累计步行(格)":12000,"playtimeTicks":7200000,"type":"STATS","t":1758000420000,"累计击杀怪物":120,"name":"Steve_CN","累计死亡":3,"累计挖到 DIAMOND_ORE":45}
+{"x":222,"type":"SESSION","gamemode":"SURVIVAL","onlineSeconds":430,"t":1758000430000,"state":"LEAVE","name":"Steve_CN","y":61,"z":258,"reason":"quit","world":"world"}
