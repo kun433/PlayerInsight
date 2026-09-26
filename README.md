@@ -1,246 +1,275 @@
-# PlayerInsight v2.1.0 — 详细玩家行为记录插件
+# PlayerInsight v2.1.0 — Detailed Player Activity Logging Plugin
 
-记录服务器里每位玩家的行为，并把记录整理成**人看得懂、AI 也能直接读**的报告。
+[English](README.md) | [中文](README.zh-CN.md)
 
-同一套功能做成两个互不相同的构建：
+Records what every player does on your server and turns those records into reports that are
+**readable by humans and directly consumable by AI**.
 
-| 构建 | 目标平台 | 字节码 | 产物 |
+The same feature set is built as two separate artifacts:
+
+| Build | Target platform | Bytecode | Artifact |
 | --- | --- | --- | --- |
 | `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.0-1.12.2.jar` |
 | `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.0-1.21.11.jar` |
 
-两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
-只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
-方块状态字符串（data 值 vs 方块状态）、玩家延迟/客户端品牌、服务器原生统计项名、游泳/激流状态。
+Both builds share identical events, data structures and report formats (the same `PlayerStats` /
+`ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
+`AsyncPlayerChatEvent`, 1.21.11 uses `AsyncChatEvent` + Adventure), block state strings (data values
+vs. block states), player ping / client brand, the server's native statistic names, and swimming / riptide state.
 
 ---
 
-## 一、安装
+## 1. Installation
 
-1. 把对应版本的 jar 放进服务器 `plugins/` 目录（**同一个服务器只需要放一个**）。
-2. 启动服务器，插件会自动生成 `plugins/PlayerInsight/config.yml`。
-3. 修改配置后用 `/pi reload` 或重启服务器生效。
+1. Put the jar for your version into the server's `plugins/` directory (**only one** of the two per server).
+2. Start the server; the plugin generates `plugins/PlayerInsight/config.yml`.
+3. Edit the configuration, then run `/pi reload` or restart the server.
 
-从 v1 升级不需要删数据：原始日志格式向后兼容，v2 会继续读老文件，并把老格式一并统计进报告。
+Upgrading from v1 does not require deleting data: the raw log format is backward compatible, v2 keeps
+reading old files and includes the old format in its reports.
 
-## 二、指令
+## 2. Commands
 
-| 指令 | 作用 |
+| Command | Effect |
 | --- | --- |
-| `/pi report <玩家>` | 生成本月报告（md + json + csv） |
-| `/pi month <玩家> <yyyy-MM>` | 生成指定月份报告 |
-| `/pi day <玩家> [yyyy-MM-dd]` | 生成某一天的玩家明细报告 |
-| `/pi blocks <玩家> [today\|month\|yyyy-MM]` | 直接在游戏里看“挖了什么方块”榜单 |
-| `/pi top [month\|day]` | 全服排行：在线时长 / 挖掘 / 死亡 Top10 |
-| `/pi last <玩家> [条数]` | 查看该玩家最近的事件（默认 10 条，最多 50） |
-| `/pi where <玩家>` | 查看玩家最后位置（在线则直接报当前位置） |
-| `/pi trace <玩家> [页码]` | 分页查询轨迹日志（每页 10 条，时间倒序） |
-| `/pi status` | 运行状态：各类开关、TPS、在线人数、轨迹/数据目录大小、心跳与跳过次数 |
-| `/pi stats [玩家]` | 已记录玩家列表 / 单个玩家本月摘要 |
-| `/pi gen <daily\|monthly\|records> [日期]` | 手动重跑自动报告 |
-| `/pi reload` | 重载配置 |
+| `/pi report <player>` | Generate this month's report (md + json + csv) |
+| `/pi month <player> <yyyy-MM>` | Generate a report for a specific month |
+| `/pi day <player> [yyyy-MM-dd]` | Generate a per-day detail report for a player |
+| `/pi blocks <player> [today\|month\|yyyy-MM]` | View a "blocks mined" leaderboard directly in game |
+| `/pi top [month\|day]` | Server leaderboards: online time / mining / deaths, Top 10 |
+| `/pi last <player> [count]` | The player's most recent events (10 by default, 50 max) |
+| `/pi where <player>` | The player's last position (current position if online) |
+| `/pi trace <player> [page]` | Paged trail log lookup (10 rows per page, newest first) |
+| `/pi status` | Runtime status: switches, TPS, online count, trail/data directory sizes, heartbeats and skips |
+| `/pi stats [player]` | List of tracked players / this month's summary for one player |
+| `/pi gen <daily\|monthly\|records> [date]` | Manually re-run an automatic report |
+| `/pi reload` | Reload the configuration |
 
-别名 `/playerinsight`；权限节点 `playerinsight.use`（默认 OP）。
-离线玩家也能用名字查询（通过 `players.yml` 索引与日志解析）。
+Alias `/playerinsight`; permission node `playerinsight.use` (OP by default).
+Offline players can also be queried by name (through the `players.yml` index and log parsing).
 
-## 三、记录了什么
+## 3. What is recorded
 
-原始事件写在 `plugins/PlayerInsight/data/<uuid>/<yyyy-MM>.jsonl`，一行一个事件。
-报告是对原始日志的重新聚合，所以**任何报告都能用 `/pi gen` 重新生成，且与日志永远一致**。
+Raw events are written to `plugins/PlayerInsight/data/<uuid>/<yyyy-MM>.jsonl`, one event per line.
+Reports are re-aggregations of those raw logs, so **any report can be regenerated with `/pi gen` and
+will always match the logs**.
 
-| 事件 | 内容 |
+| Event | Contents |
 | --- | --- |
-| `SESSION` | 登录/登出、IP、客户端品牌、延迟、游戏模式、世界、坐标；登出带本次在线时长 |
-| `MOVE` | 世界/维度、坐标、朝向、位移距离、**移动方式**（行走/疾跑/潜行/游泳/飞行/鞘翅/船/矿车/骑马）、群系、脚下方块、亮度 |
-| `BLOCK` | **破坏/放置**：材质、世界、精确坐标、Y 层、**手持工具**、方块状态、亮度、是否矿物；破坏时还带上**掉落物清单**（如 `DIAMOND x1`） |
-| `ITEM` | 拾取/丢弃/食用/合成/熔炼/附魔/铁砧/酿造/剪羊毛/繁殖/驯服/装桶倒桶/工具磨损与损坏（含数量、坐标）；**钓鱼结果**（CAUGHT_FISH / FAILED_ATTEMPT…）；**村民交易**（换到什么、几个）；**抛射物发射**（箭/三叉戟/末影珍珠/雪球/药水） |
-| `COMBAT` | **战斗汇总**：每 N 秒把命中次数、造成伤害、武器、攻击目标分布写成一条事件（不会一次战斗写几百条日志） |
-| `SNAPSHOT` | **下线快照**：等级/经验/生命/饱食/位置/手持/装备 + 背包物品统计（多少种、多少个、主要物品） |
-| `CONTAINER` | 打开容器：类型（箱子/熔炉/末影箱/木桶…）、自定义标题、坐标 |
-| `CHAT` / `COMMAND` | 聊天原文、指令原文与指令名、位置 |
-| `DEATH` | 死因、凶手、坐标、**掉落物清单**、损失经验、等级、当时装备 |
-| `KILL` / `PVP` | 击杀玩家、PvP 交手（伤害、武器、剩余血量、坐标） |
-| `MOBKILL` | 击杀怪物类型、武器、坐标、掉落经验 |
-| `DAMAGE_TAKEN` | 非玩家来源的受伤（原因、来源实体、伤害值、坐标） |
-| `ADVANCEMENT` | 成就达成（过滤掉配方类成就） |
-| `WORLD` / `TELEPORT` / `PORTAL` | 换世界、传送（含原因与起止坐标）、走传送门 |
-| `SLEEP` / `GAMEMODE` / `LEVEL` | 睡觉、游戏模式切换、升级 |
-| `IGNITE` / `SIGN` | 点火、告示牌内容 |
-| `STATS` | **服务器原生累计统计快照**（登录/登出时抓取）：累计游戏时长、死亡、击杀、钓鱼、附魔、各移动方式距离、主要矿物挖掘量等历史总量 |
-| `TRAIL` | **定时心跳**：每 N 分钟记录位置 + 手持物品（供报告统计；同时写入一份人类可读的轨迹日志） |
+| `SESSION` | Join/quit, IP, client brand, ping, game mode, world, coordinates; quit includes the session duration |
+| `MOVE` | World/dimension, coordinates, facing, distance moved, **movement mode** (walk/sprint/sneak/swim/fly/elytra/boat/minecart/horse), biome, block below, light level |
+| `BLOCK` | **Break/place**: material, world, exact coordinates, Y level, **held tool**, block state, light level, whether it is an ore; breaking also includes the **drop list** (e.g. `DIAMOND x1`) |
+| `ITEM` | Pickup/drop/eat/craft/smelt/enchant/anvil/brew/shear/breed/tame/fill and empty bucket/tool wear and break (with counts and coordinates); **fishing results** (CAUGHT_FISH / FAILED_ATTEMPT…); **villager trades** (what was traded and how many); **projectile launches** (arrow/trident/ender pearl/snowball/potion) |
+| `COMBAT` | **Combat summary**: every N seconds writes hits, damage dealt, weapon and target distribution as a single event (no hundreds of log lines per fight) |
+| `SNAPSHOT` | **Quit snapshot**: level/experience/health/food/position/held item/equipment + inventory statistics (how many kinds, how many items, main items) |
+| `CONTAINER` | Container opened: type (chest/furnace/ender chest/barrel…), custom title, coordinates |
+| `CHAT` / `COMMAND` | Raw chat text, raw command text and command name, position |
+| `DEATH` | Cause, killer, coordinates, **drop list**, experience lost, level, equipment at the time |
+| `KILL` / `PVP` | Player kills and PvP exchanges (damage, weapon, remaining health, coordinates) |
+| `MOBKILL` | Mob type killed, weapon, coordinates, experience dropped |
+| `DAMAGE_TAKEN` | Damage from non-player sources (cause, source entity, amount, coordinates) |
+| `ADVANCEMENT` | Advancement earned (recipe advancements filtered out) |
+| `WORLD` / `TELEPORT` / `PORTAL` | World changes, teleports (with cause and from/to coordinates), portals |
+| `SLEEP` / `GAMEMODE` / `LEVEL` | Sleeping, game mode changes, level-ups |
+| `IGNITE` / `SIGN` | Igniting blocks, sign contents |
+| `STATS` | **Server-native cumulative statistics snapshot** (captured on join/quit): total play time, deaths, kills, fish caught, enchantments, distance per movement mode, ores mined, and other lifetime totals |
+| `TRAIL` | **Periodic heartbeat**: records position + held item every N minutes (for report statistics; also appended to a human-readable trail log) |
 
-另有 `players.yml` 玩家索引（uuid ↔ 名称、首次/最后出现时间，历史日志也会自动补全）。
+There is also a `players.yml` player index (uuid ↔ name, first/last seen; historical logs are backfilled automatically).
 
-## 四、生成了什么报告
+## 4. What reports are produced
 
 ```
 plugins/PlayerInsight/
-├── data/<uuid>/<yyyy-MM>.jsonl      # 原始事件（追加写入，永不重写）
-├── players.yml                      # 玩家索引
-├── state.properties                 # 自动报告进度
+├── data/<uuid>/<yyyy-MM>.jsonl      # raw events (append-only, never rewritten)
+├── players.yml                      # player index
+├── state.properties                 # automatic report progress
 ├── reports/
-│   ├── daily/<日期>-all-players.md   # 全服日报（含总表、方块榜、每人明细）
-│   ├── daily/<日期>-all-players.json # 机器可读日报
-│   ├── daily/<日期>-all-players.csv  # 表格日报（一行一人）
-│   ├── monthly/<玩家>-<月>-report.md        # 玩家月报（19 个章节）
-│   ├── monthly/<玩家>-<月>-summary.json     # 机器可读月报汇总
-│   ├── monthly/<玩家>-<月>-blocks.csv       # 方块统计（挖掘/放置/矿物）
-│   └── monthly/<月>-all-players.md          # 全服月度汇总
-├── trail/                                   # 轨迹文本日志（人类可读，按时段滚动）
-│   └── 2026-09-21-20.log                    # 时间 | 玩家 | 世界:X:Y:Z | 手持物品 | 备注
-└── records/<玩家>/<玩家>-<起>_to_<止>.md    # 每 N 天的玩家记录（逐日 + 明细）
+│   ├── daily/<date>-all-players.md   # server daily report (summary table, block leaderboard, per-player detail)
+│   ├── daily/<date>-all-players.json # machine-readable daily report
+│   ├── daily/<date>-all-players.csv  # tabular daily report (one row per player)
+│   ├── monthly/<player>-<month>-report.md        # player monthly report (19 sections)
+│   ├── monthly/<player>-<month>-summary.json     # machine-readable monthly summary
+│   ├── monthly/<player>-<month>-blocks.csv       # block statistics (broken/placed/ores)
+│   └── monthly/<month>-all-players.md            # server-wide monthly summary
+├── trail/                                   # trail text log (human-readable, rolled by period)
+│   └── 2026-09-21-20.log                    # time | player | world:X:Y:Z | held item | note
+└── records/<player>/<player>-<from>_to_<to>.md    # per-N-day player records (day-by-day + detail)
 ```
 
-月报章节：关键指标 → 会话时间线 → 移动与活动范围 → **挖掘明细（按材质 + 矿物 + Y 层分布 + 工具 + 每次破坏的坐标/状态/亮度 + 每种矿物的首/末次获得时间）**
-→ 放置明细 → 物品与生产 → 容器访问 → 战斗（死亡含掉落物/装备） → 进度与生活行为 → 聊天与指令
-→ 世界/维度/传送 → 管理指令审计 → **风险参考信号**（挖掘速度、矿物产出速度、深层矿物占比、凌晨挖矿比例、容器访问频率等）
-→ 服务器原生累计统计 → **活跃时段与活动区域**（24 小时直方图 + 高频活动区块 Top15）
-→ **产出、战斗与交互细节**（掉落物合计、命中/伤害/攻击目标/武器、抛射物、村民交易、钓鱼结果）
-→ **最近一次下线时的状态**（等级/生命/位置/装备 + 背包统计）
-→ **逐日明细**（当月每天的在线/挖掘/放置/死亡/聊天…）→ 附录（原始事件计数）。
+Monthly report sections: key metrics → session timeline → movement and activity range →
+**mining detail (by material + ores + Y-level distribution + tools + coordinates/state/light of every break + first/last time each ore was obtained)**
+→ placement detail → items and production → container access → combat (deaths include drops and equipment) → progress and life activities → chat and commands
+→ worlds/dimensions/teleports → admin command audit → **risk reference signals** (mining speed, ore output rate, deep-ore share, late-night mining share, container access frequency, …)
+→ server-native cumulative statistics → **active hours and activity areas** (24-hour histogram + Top 15 activity chunks)
+→ **output, combat and interaction detail** (total drops, hits/damage/targets/weapons, projectiles, villager trades, fishing results)
+→ **state at the most recent logout** (level/health/position/equipment + inventory statistics)
+→ **day-by-day detail** (online/mining/placing/deaths/chat… for each day of the month) → appendix (raw event counts).
 
-示例见 `示例报告/` 目录（用真实事件格式生成的样例）。
+See the `示例报告/` directory for examples (samples generated in the real event format).
 
-## 五、配置要点
+## 5. Configuration highlights
 
-`config.yml` 中每一项都有中文注释，常用开关：
+Every entry in `config.yml` is commented. Common switches:
 
-- `record.*`：逐类开关（方块、物品、容器、生产、农牧、成就、战斗、伤害、传送、**村民交易**、**抛射物**、**下线快照**等）。
-- `trail-log.*`：轨迹文本日志（目录、间隔、滚动小时数、保留天数、Excel BOM、JSONL 心跳间隔、TPS 阈值、事件驱动）。
-- `filter.*`：假人过滤、世界黑名单、玩家黑名单、权限豁免。
-- `block-detail.*`：方块明细粒度（坐标、Y 层分布、工具、方块状态、亮度）。关掉只会让日志更小，不影响计数。
-- `combat-summary.interval-seconds`：战斗汇总的间隔（默认 60 秒）。
-- `report.per-day-detail`：月报里是否生成“逐日明细”表（默认开）。
-- `move-log.interval-seconds` / `only-when-moved`：移动采样间隔与是否只在移动时记录（默认 5 秒、只在移动时记）。
-- `export.json` / `export.csv`：是否额外导出机器可读格式。
-- `player-record.interval-days`：每 N 天生成一份玩家记录。
+- `record.*`: per-category switches (blocks, items, containers, production, farming/breeding, advancements, combat, damage, teleports, **villager trades**, **projectiles**, **quit snapshots**, …).
+- `trail-log.*`: trail text log (directory, interval, rolling hours, retention days, Excel BOM, JSONL heartbeat interval, TPS threshold, event-driven writes).
+- `filter.*`: bot filtering, world blacklist, player blacklist, permission exemption.
+- `block-detail.*`: block detail granularity (coordinates, Y-level distribution, tools, block state, light level). Turning these off only makes logs smaller; counts are unaffected.
+- `combat-summary.interval-seconds`: combat summary interval (60 s by default).
+- `report.per-day-detail`: whether the monthly report includes the day-by-day table (on by default).
+- `move-log.interval-seconds` / `only-when-moved`: movement sampling interval and whether to record only while moving (5 s and moving-only by default).
+- `export.json` / `export.csv`: whether to also export machine-readable formats.
+- `player-record.interval-days`: generate a player record every N days.
 
-写入策略：原始日志按玩家+月份缓冲写入，每 40 行或每 5 秒落盘一次；关服时全部刷盘。事件同时写入不受异步线程影响（内部同步）。
+Write strategy: raw logs are buffered per player and per month and flushed every 40 lines or every
+5 seconds; everything is flushed on shutdown. Events are written synchronously so async threads cannot interfere with them.
 
-## 六、确认服务器真的加载了新版本
+## 6. Verifying the server really loaded the new version
 
-报告文件**只会生成一次**：某天的日报已经存在时，插件不会自动重写它（避免覆盖已归档的记录）。
-所以“换了新 jar 但报告还是旧的”通常是这两个原因：
+Report files are **generated only once**: if a day's report already exists, the plugin does not rewrite
+it automatically (to avoid overwriting archived records). So "I swapped in a new jar but the report is
+still old" usually has one of these two causes:
 
-1. **服务器里还放着旧 jar**：旧版 1.21.11 的文件名是 `PlayerInsight-1.21.11.jar`（v1），
-   新的是 `PlayerInsight-1.21.11-5.jar`（v5）。名字不同不等于版本不同，看启动日志最准：
+1. **The old jar is still in the server**: the old 1.21.11 file was named `PlayerInsight-1.21.11.jar` (v1),
+   while the new one is `PlayerInsight-1.21.11-5.jar` (v5). A different name does not mean a different version —
+   the startup log is the reliable signal:
 
    ```text
    [PlayerInsight] Loading server plugin PlayerInsight v1.21.11-5
    [PlayerInsight] Enabling PlayerInsight v1.21.11-5
    ```
 
-   日志里如果是 v1 或 `1.21.11-1`，说明加载的还是旧 jar。
-2. **旧报告没有被重写**：用指令重新生成即可（日报按天，月报按月）：
+   If the log says v1 or `1.21.11-1`, the old jar is still being loaded.
+2. **The old report was not rewritten**: regenerate it with a command (daily reports by day, monthly reports by month):
 
    ```text
    /pi gen daily 2026-09-20
    /pi gen monthly 2026-09
    ```
 
-   也可以直接删掉 `plugins/PlayerInsight/reports/daily/` 下对应日期的旧文件，让插件下次自动重建。
+   You can also delete the corresponding old files under `plugins/PlayerInsight/reports/daily/` so the plugin rebuilds them automatically next time.
 
-另外：`reports/daily/<日期>-all-players.md` 第三节就是“方块榜（全部玩家合并）”。
-如果那一节显示“_当日没有挖掘记录。_”，说明当天确实没有采集到挖掘事件（例如没人挖方块，
-或那天的数据是旧版记录的）。
+Also note: the third section of `reports/daily/<date>-all-players.md` is the "block leaderboard (all players merged)".
+If it shows "_当日没有挖掘记录。_", there genuinely were no mining events captured that day (nobody broke
+blocks, or that day's data came from an older version).
 
-## 七、自己编译
+## 7. Building from source
 
-每个版本目录里都有 `build.ps1`（只用 `javac` + `jar`，不需要 Maven/Gradle）：
+Each version directory contains a `build.ps1` (uses only `javac` + `jar`; no Maven/Gradle needed):
 
 ```powershell
-cd 1.12.2 ; .\build.ps1      # 需要 JDK 11（--release 8）
-cd 1.21.11 ; .\build.ps1     # 需要 JDK 21（--release 21）
+cd 1.12.2 ; .\build.ps1      # requires JDK 11 (--release 8)
+cd 1.21.11 ; .\build.ps1     # requires JDK 21 (--release 21)
 ```
 
-依赖（已随项目提供，放在各版本的 `lib/`）：
+Dependencies (shipped with the project, under each version's `lib/`):
 
-- 1.12.2：`paper-api-1.12.2.jar`、`bungeecord-chat.jar`
-- 1.21.11：`paper-api-1.21.11.jar`、`adventure-api/key/text-serializer-plain`、`examination-api`、`bungeecord-chat-1.21.jar`
-- `shaded/`：已重定位的 Gson（`com.playerinsight.lib.gson`），打包进 jar，避免与其它插件冲突。
+- 1.12.2: `paper-api-1.12.2.jar`, `bungeecord-chat.jar`
+- 1.21.11: `paper-api-1.21.11.jar`, `adventure-api/key/text-serializer-plain`, `examination-api`, `bungeecord-chat-1.21.jar`
+- `shaded/`: relocated Gson (`com.playerinsight.lib.gson`), packaged into the jar so it cannot conflict with other plugins.
 
-## 八、离线回放测试
+## 8. Offline replay tests
 
-`tests/ReplayHarness.java` 可以脱离服务器，把一份 JSONL 事件喂进聚合模型并生成全部报告，
-用来验证报告质量与旧数据兼容性：
+`tests/ReplayHarness.java` can feed a JSONL event file into the aggregation model and produce every
+report without a server, which is how report quality and old-data compatibility are verified:
 
 ```powershell
 $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2\lib\bungeecord-chat.jar"
 & "C:\Program Files\Java\jdk-11\bin\javac.exe" -encoding UTF-8 -classpath $cp -d tests tests\ReplayHarness.java
-& "C:\Program Files\Java\jdk-11\bin\java.exe" -classpath "tests;$cp" ReplayHarness <事件.jsonl> <输出目录> <玩家名> <uuid> <yyyy-MM>
+& "C:\Program Files\Java\jdk-11\bin\java.exe" -classpath "tests;$cp" ReplayHarness <events.jsonl> <output dir> <player name> <uuid> <yyyy-MM>
 ```
 
-`tests/smoke-test.ps1` 会在隔离目录里真的启动一个 Paper 服务器，检查插件加载、
-事件注册、`/pi` 指令与报告生成（两版都已用真实服务器验证通过）。
+`tests/smoke-test.ps1` actually starts a Paper server in an isolated directory and checks plugin
+loading, event registration, `/pi` commands and report generation (both builds have been verified
+against a real server).
 
-## 九、v2 相对 v1 的变化
+## 9. What changed from v1 to v2
 
-1. 方块记录从“只有总数”变成“**每个方块都有材质、坐标、工具、状态、亮度、Y 层**”，并按材质统计、算占比。
-2. 新增矿物专项分析：矿物种类、Y<16 / Y<0 数量、凌晨挖矿比例、分布区块数。
-3. 新增物品与生产全链路（合成/熔炼/附魔/铁砧/酿造/钓鱼产物/剪毛/繁殖/驯服/装桶/工具磨损）。
-4. 新增容器访问、击杀怪物、受伤来源、传送/传送门、睡觉、升级、点火、告示牌、成就。
-5. 死亡记录带掉落物清单、损失经验、等级与装备。
-6. 报告从 11 个粗章节扩展为 19 个明细章节，并额外产出 JSON（给 AI/脚本）与 CSV（给 Excel）。
-7. 在线时长改为按 JOIN/LEAVE 配对精确计算（旧版会把月内累计当成当日时长）。
-8. 中文聊天增加二字组合分词，高频词表对中文服务器才有意义。
-9. 新增 `players.yml` 玩家索引与历史日志补全，离线玩家可查、可读。
-10. 兼容 v1 的旧日志（包括旧版把拾取/丢弃/食用写成 `BLOCK` 事件的情况）。
+1. Block logging went from "totals only" to "**every block carries material, coordinates, tool, state, light level and Y level**", aggregated by material with shares.
+2. New ore-specific analysis: ore types, Y<16 / Y<0 counts, late-night mining share, number of chunks involved.
+3. New full item and production chain (craft/smelt/enchant/anvil/brew/fishing output/shear/breed/tame/bucket/tool wear).
+4. New container access, mob kills, damage sources, teleport/portal, sleep, level-up, ignite, sign and advancement events.
+5. Death records carry the drop list, experience lost, level and equipment.
+6. Reports grew from 11 coarse sections to 19 detailed ones, plus JSON (for AI/scripts) and CSV (for Excel).
+7. Online time is now computed precisely by pairing JOIN/LEAVE (the old version counted a month's accumulation as a day's time).
+8. Chinese chat gained two-character bigram tokenisation; the frequent-word tables only make sense on Chinese servers.
+9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
+10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
 
-### `-3` 微调（2026-09-21）
+### v2.1.0 update
 
-- 每日/月度报告的“方块榜（全部玩家合并）”升级：新增全服挖掘总数与材质数，
-  表格带**排名、参与玩家数、主要玩家（Top3 贡献者与占比）**，超过 25 种时提示其余见各玩家明细。
-- “玩家总表”下方新增**各玩家挖掘 Top3** 一行，方便一眼对比谁在挖什么。
-- 两版源码仍为同一套（只 `Compat` 与聊天事件不同），生成的报告逐行一致。
+- Version numbers unified as `2.1.0-1.12.2` / `2.1.0-1.21.11`
+- Artifact names unified as `PlayerInsight-2.1.0-*.jar`
+- Functionally identical to `-5`; only the version number changed
 
-### `-4` 大强化（2026-09-21）：两个版本一起上
+### `-3` refinements (2026-09-21)
 
-> 两个版本一直是同一套源码（只 `Compat` 与聊天事件不同），所以强化同时落到 1.12.2 与 1.21.11，
-> 两边生成的报告逐行一致（已用同一份事件数据对比验证）。
+- The "block leaderboard (all players merged)" in daily/monthly reports was upgraded: it now shows the
+  server-wide total and material count, and the table carries the **rank, number of contributing players
+  and top 3 contributors with their shares**; when more than 25 materials exist it points to the per-player detail.
+- A **top 3 mined materials** line was added per player under the player table, making it easy to compare who mines what at a glance.
+- Both builds still share one codebase (only `Compat` and the chat event differ) and produce line-identical reports.
 
-记录层：
+### `-4` major upgrade (2026-09-21): both versions at once
 
-1. **方块掉落物**：每次破坏多记一条 `drops`（如 `DIAMOND x1`），报告里可看“挖矿到底产出了什么”。
-2. **战斗汇总 `COMBAT`**：每 60 秒把命中次数/伤害/武器/攻击目标写成一条事件（PvP 仍逐条记录），
-   既能看到战斗强度，又不会一次战斗刷几百条日志。
-3. **抛射物 `SHOOT`**：箭 / 三叉戟 / 末影珍珠 / 雪球 / 药水等发射记录。
-4. **村民交易 `TRADE`**：交易换到的物品与数量、商人标题。
-5. **钓鱼结果**：CAUGHT_FISH / CAUGHT_ENTITY / FAILED_ATTEMPT / IN_GROUND，能算成功率。
-6. **下线快照 `SNAPSHOT`**：等级/经验/生命/饱食/位置/手持/装备 + 背包统计（多少种、多少个、主力物品）。
-7. **矿物首/末次获得时间**：每种矿物第一次和最后一次到手的时间。
-8. **活动热度**：按小时的事件量与挖方块量、按区块的到达次数。
+> The two versions have always shared one codebase (only `Compat` and the chat event differ), so this
+> upgrade landed on both 1.12.2 and 1.21.11, and both produce line-identical reports (verified by
+> comparing against the same event data).
 
-报告层（月报新增 4 个章节，共 19 章）：
+Recording layer:
 
-- 十五、活跃时段与活动区域（24 小时直方图 + 高频活动区块 Top15）
-- 十六、产出、战斗与交互细节（掉落物合计、战斗统计、武器、抛射物、交易、钓鱼）
-- 十七、最近一次下线时的状态（含背包物品 Top20）
-- 十八、逐日明细（当月每一天的在线/会话/移动/挖掘/矿物/放置/容器/死亡/击杀/聊天/指令）
+1. **Block drops**: every break also records a `drops` line (e.g. `DIAMOND x1`), so reports can show what mining actually yields.
+2. **Combat summary `COMBAT`**: hits/damage/weapon/targets are written as one event every 60 seconds (PvP is still recorded per exchange),
+   showing combat intensity without hundreds of log lines per fight.
+3. **Projectiles `SHOOT`**: launches of arrows / tridents / ender pearls / snowballs / potions.
+4. **Villager trades `TRADE`**: items and counts obtained, plus the merchant's title.
+5. **Fishing results**: CAUGHT_FISH / CAUGHT_ENTITY / FAILED_ATTEMPT / IN_GROUND, so success rates can be computed.
+6. **Quit snapshot `SNAPSHOT`**: level/experience/health/food/position/held item/equipment + inventory statistics.
+7. **First/last acquisition time per ore**.
+8. **Activity heat**: hourly event and block-break counts, plus arrivals per chunk.
 
-指令层：新增 `/pi top [month|day]`（全服排行）、`/pi last <玩家> [条数]`（最近事件）、
-`/pi where <玩家>`（最后位置，在线时直接报当前位置），且 `/pi gen monthly` 会生成带逐日表的月报。
+Report layer (4 new monthly sections, 19 in total):
 
-配置层：新增 `record.trading` / `record.projectiles` / `record.snapshots`、
-`combat-summary.interval-seconds`、`report.per-day-detail` 五个开关。
+- 15. Active hours and activity areas (24-hour histogram + Top 15 activity chunks)
+- 16. Output, combat and interaction detail (total drops, combat stats, weapons, projectiles, trades, fishing)
+- 17. State at the most recent logout (including inventory Top 20)
+- 18. Day-by-day detail (online/session/movement/mining/ores/placing/containers/deaths/kills/chat/commands for each day)
 
-### `-5` 参考 PlayerMoveLog 的大强化（2026-09-21）
+Command layer: new `/pi top [month|day]` (server leaderboards), `/pi last <player> [count]` (recent events)
+and `/pi where <player>` (last position, current position when online); `/pi gen monthly` now produces a
+monthly report with the day-by-day table.
 
-参考 [PlayerMoveLog](https://github.com/KUBOAKI01/movelog) 的思路，把“定时心跳 + 人类可读轨迹日志”并进 PlayerInsight：
+Configuration layer: five new switches — `record.trading` / `record.projectiles` / `record.snapshots`,
+`combat-summary.interval-seconds`, `report.per-day-detail`.
 
-1. **轨迹文本日志**（默认 `plugins/PlayerInsight/trail/`，可改成服务器根目录的 `movelog`）：
+### `-5` major upgrade modelled on PlayerMoveLog (2026-09-21)
+
+Taking the idea from [PlayerMoveLog](https://github.com/KUBOAKI01/movelog), periodic heartbeats and a
+human-readable trail log were folded into PlayerInsight:
+
+1. **Trail text log** (default `plugins/PlayerInsight/trail/`; can be pointed at a `movelog` directory in the server root):
 
    ```text
    2026-09-21 20:30:05 | Steve | world:120.50:64.00:-45.20 | minecraft:diamond_sword | 心跳
    ```
 
-   格式为 `时间 | 玩家 | 世界:X:Y:Z | 手持物品 | 备注`（备注可省略），坐标两位小数，UTF-8；
-   默认每 4 小时一个文件（`2026-09-21-20.log`），可选 Excel 兼容 BOM，超期文件自动清理。
-2. **定时心跳**：默认每 60 秒记录一次所有在线玩家（含挂机的人），并可选每 5 分钟额外写一条 `TRAIL` 到 JSONL 供报告统计。
-3. **事件驱动补记**：加入 / 退出 / 死亡 / 换世界时立刻补一条轨迹行。
-4. **TPS 保护**：TPS 低于阈值（默认 18）跳过本轮；不会在卡服时刷磁盘。
-5. **过滤与豁免**：假人（`getAddress()==null`）自动跳过；可配世界黑名单、玩家黑名单、权限豁免。
-6. **零阻塞**：主线程只采集数据（不碰磁盘），写盘全部在异步线程，且带原子防重入与失败退避。
-7. **新指令**：`/pi trace <玩家> [页码]` 查轨迹、`/pi status` 看运行状态。
-8. **报告新增**：月报「十五」新增「15.3 位置心跳」（心跳次数、所在世界、常持物品、最后一次心跳位置与手持）；
-   JSON 汇总里增加 `heartbeats` / `heartbeatsByHour` / `heldItems` / `lastHeartbeat`。
-9. **测试**：新增 `tests/TrailLogTest.java`（行格式、分桶、BOM、清理共 24 项断言，两版编译产物各跑一遍）。
+   The format is `time | player | world:X:Y:Z | held item | note` (the note is optional), coordinates with two
+   decimals, UTF-8; one file per 4 hours by default (`2026-09-21-20.log`), optional Excel-compatible BOM, expired files cleaned up automatically.
+2. **Periodic heartbeat**: by default every 60 seconds it records every online player (including idle ones), and optionally writes an extra `TRAIL` line to the JSONL every 5 minutes for report statistics.
+3. **Event-driven additions**: a trail line is written immediately on join / quit / death / world change.
+4. **TPS protection**: when TPS is below the threshold (18 by default) the round is skipped, so the plugin never hammers the disk on a lagging server.
+5. **Filtering and exemptions**: bots (`getAddress()==null`) are skipped automatically; world blacklist, player blacklist and permission exemption are configurable.
+6. **Zero blocking**: the main thread only collects data (never touches the disk); all writes happen on async threads with atomic re-entrancy protection and failure back-off.
+7. **New commands**: `/pi trace <player> [page]` for the trail, `/pi status` for runtime state.
+8. **Report additions**: monthly section 15 gained "15.3 Position heartbeats" (heartbeat count, worlds, commonly held items,
+   last heartbeat position and held item); the JSON summary gained `heartbeats` / `heartbeatsByHour` / `heldItems` / `lastHeartbeat`.
+9. **Tests**: new `tests/TrailLogTest.java` (line format, bucketing, BOM and cleanup — 24 assertions, run against both builds' output).
+
+## 10. License
+
+MIT License, see `LICENSE`.
+
+---
+
+本插件由ai编写-deepseek-V4.1-flash留言
