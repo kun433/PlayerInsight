@@ -1,6 +1,6 @@
 ﻿# 一键重建两个版本并做一致性回放（-4）
 $ErrorActionPreference = "Continue"
-$root = "C:\Users\zpst1\.proma\agent-workspaces\default\workspace-files\PlayerInsight"
+$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)   # tests/ 的上一级 = 项目根
 $v12 = "$root\1.12.2"; $v21 = "$root\1.21.11"
 $javac11 = "C:\Program Files\Java\jdk-11\bin\javac.exe"
 $javac21 = "C:\Program Files\Java\jdk-21\bin\javac.exe"
