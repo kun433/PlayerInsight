@@ -51,7 +51,7 @@ Copy-Item -Recurse "$base\shaded\com" $stage -Force
 Copy-Item "$base\resources\plugin.yml" $stage -Force
 Copy-Item "$base\resources\config.yml" $stage -Force
 New-Item -ItemType Directory -Force -Path "$base\dist" | Out-Null
-$outJar = "$base\dist\PlayerInsight-2.1.0-1.21.11.jar"
+$outJar = "$base\dist\PlayerInsight-2.1.1-1.21.11.jar"
 Remove-Item -Force $outJar -ErrorAction SilentlyContinue
 & $jar cf $outJar -C $stage .
 if ($LASTEXITCODE -ne 0) {

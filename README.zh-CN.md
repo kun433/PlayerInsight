@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.0 — 详细玩家行为记录插件
+# PlayerInsight v2.1.1 — 详细玩家行为记录插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -9,7 +9,10 @@
 | 构建 | 目标平台 | 字节码 | 产物 |
 | --- | --- | --- | --- |
 | `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.0-1.21.11.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.1-1.21.11.jar` |
+
+v2.1.1 只动 1.21.11 构建（新的插件联动需要 PlaceholderAPI，只在 1.21.x 上有意义）；
+1.12.2 构建没有改动，仍为 2.1.0。
 
 两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
 只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
@@ -39,6 +42,7 @@
 | `/pi trace <玩家> [页码]` | 分页查询轨迹日志（每页 10 条，时间倒序） |
 | `/pi status` | 运行状态：各类开关、TPS、在线人数、轨迹/数据目录大小、心跳与跳过次数 |
 | `/pi stats [玩家]` | 已记录玩家列表 / 单个玩家本月摘要 |
+| `/pi pd [玩家]` | 查看插件数据（经 PlaceholderAPI，如 Paper's Delight 的烹饪统计与效果） |
 | `/pi gen <daily\|monthly\|records> [日期]` | 手动重跑自动报告 |
 | `/pi reload` | 重载配置 |
 
@@ -87,6 +91,7 @@ plugins/PlayerInsight/
 │   ├── monthly/<玩家>-<月>-report.md        # 玩家月报（19 个章节）
 │   ├── monthly/<玩家>-<月>-summary.json     # 机器可读月报汇总
 │   ├── monthly/<玩家>-<月>-blocks.csv       # 方块统计（挖掘/放置/矿物）
+│   ├── monthly/<玩家>-<月>-integrations.json # 插件数据（PlaceholderAPI，能解析时才生成）
 │   └── monthly/<月>-all-players.md          # 全服月度汇总
 ├── trail/                                   # 轨迹文本日志（人类可读，按时段滚动）
 │   └── 2026-09-21-20.log                    # 时间 | 玩家 | 世界:X:Y:Z | 手持物品 | 备注
@@ -115,6 +120,7 @@ plugins/PlayerInsight/
 - `report.per-day-detail`：月报里是否生成“逐日明细”表（默认开）。
 - `move-log.interval-seconds` / `only-when-moved`：移动采样间隔与是否只在移动时记录（默认 5 秒、只在移动时记）。
 - `export.json` / `export.csv`：是否额外导出机器可读格式。
+- `integrations.placeholderapi.*`：经 PlaceholderAPI 的插件联动（见第十节）。
 - `player-record.interval-days`：每 N 天生成一份玩家记录。
 
 写入策略：原始日志按玩家+月份缓冲写入，每 40 行或每 5 秒落盘一次；关服时全部刷盘。事件同时写入不受异步线程影响（内部同步）。
@@ -188,6 +194,19 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 9. 新增 `players.yml` 玩家索引与历史日志补全，离线玩家可查、可读。
 10. 兼容 v1 的旧日志（包括旧版把拾取/丢弃/食用写成 `BLOCK` 事件的情况）。
 
+### v2.1.1 更新（2026-09-27）：适配了一些插件
+
+- 新增**插件联动层**，软依赖 PlaceholderAPI：其他插件的数据现在可以展现在 PlayerInsight 的指令与报告里
+  （见第十节）。没装 PlaceholderAPI 时一切不变，报告与 v2.1.0 逐字一致。
+- 内置 **Paper's Delight**（《农夫乐事》插件版）档案：厨锅 / 煎锅 / 砧板累计次数（支持离线玩家），
+  以及滋养 / 舒适 / 大蒜三种效果的当前状态、剩余时间与累计施加次数（仅在线玩家）。
+- 新增指令 `/pi pd [玩家]`；月报新增「附：插件数据（PlaceholderAPI，实时）」章节与
+  `…-integrations.json` 边车文件，解析不到数据时整节不输出。
+- 修正 1.21.11 的 `plugin.yml` **`api-version`**：原来误填成插件版本号（`2.1.0-1.21.11`），
+  现改为合法值 `1.21`。
+- 只改 1.21.11 构建；1.12.2 构建仍为 2.1.0。
+- 新增离线测试 `tests/IntegrationTest.java`（占位符名、解析规则、渲染与报告章节位置，共 40 条断言）。
+
 ### v2.1.0 更新
 
 - 版本号统一为 `2.1.0-1.12.2` / `2.1.0-1.21.11`
@@ -253,7 +272,53 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
    JSON 汇总里增加 `heartbeats` / `heartbeatsByHour` / `heldItems` / `lastHeartbeat`。
 9. **测试**：新增 `tests/TrailLogTest.java`（行格式、分桶、BOM、清理共 24 项断言，两版编译产物各跑一遍）。
 
-## 十、许可
+## 十、插件联动（PlaceholderAPI）
+
+PlayerInsight 可以读取**其他插件**的数据：通过 [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/)
+占位符把它们展示到指令与报告里——这就是 v2.1.1 “适配了一些插件”的含义。它是**软依赖**：
+没装 PlaceholderAPI 时整个联动层自动关闭，报告与 v2.1.0 逐字一致。
+
+内置档案 —— **Paper's Delight**（《农夫乐事》插件版）：
+
+| 分组 | 数据 | 占位符（据 Paper's Delight 官方文档） |
+| --- | --- | --- |
+| 厨锅 | 取出成品总次数 | `%papersdelight_cooking_pot_cook_of_<玩家名>%` |
+| 煎锅 | 煎制食物总次数 | `%papersdelight_skillet_cook_of_<玩家名>%` |
+| 砧板 | 切制总次数 | `%papersdelight_cutting_board_cut_of_<玩家名>%` |
+| 滋养 / 舒适 / 大蒜 | 是否生效、剩余时间（M:SS）、累计施加次数 | `%papersdelight_<玩家名>_effect_<效果>[_time_remaining_formatted\|_times]%` |
+
+三个厨具计数对**离线玩家**同样有效；效果类只在玩家在线时能解析。数据出现的位置：
+
+- `/pi pd [玩家]`：在游戏内直接打印（不带参数 = 自己）。
+- 玩家月报在结尾前追加 `## 附：插件数据（PlaceholderAPI，实时）` 章节，并生成机器可读的
+  `…-integrations.json` 边车文件；解析不到任何数据时两者都不输出。
+
+这些数值是插件自身的**累计统计**，不是当月 JSONL 的回放，因此 `/pi gen` 不会改变它们；
+只对服务器仍有缓存的玩家解析，且不会发起阻塞式联网查询。
+
+接入其他插件：
+
+```yaml
+integrations:
+  placeholderapi:
+    enabled: true
+    report-section: true
+    export-json: true
+    papersdelight:
+      enabled: true
+    custom:
+      - group: "某插件"
+        label: "当前余额"
+        placeholder: "%someplugin_balance_{player}%"
+      - group: "某插件"
+        label: "今日签到"
+        placeholder: "%someplugin_streak_{player}%"
+        online-only: true
+```
+
+`{player}` 会替换成玩家名；PlaceholderAPI 原样退回的占位符（插件未安装或占位符不存在）会被静默跳过。
+
+## 十一、许可
 
 MIT License，见 `LICENSE`。
 

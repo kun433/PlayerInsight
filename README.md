@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.0 — Detailed Player Activity Logging Plugin
+# PlayerInsight v2.1.1 — Detailed Player Activity Logging Plugin
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -10,7 +10,10 @@ The same feature set is built as two separate artifacts:
 | Build | Target platform | Bytecode | Artifact |
 | --- | --- | --- | --- |
 | `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.0-1.21.11.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.1-1.21.11.jar` |
+
+v2.1.1 only touches the 1.21.11 build (the new plugin integration needs PlaceholderAPI, which is only
+relevant on 1.21.x); the 1.12.2 build is unchanged and stays at 2.1.0.
 
 Both builds share identical events, data structures and report formats (the same `PlayerStats` /
 `ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
@@ -42,6 +45,7 @@ reading old files and includes the old format in its reports.
 | `/pi trace <player> [page]` | Paged trail log lookup (10 rows per page, newest first) |
 | `/pi status` | Runtime status: switches, TPS, online count, trail/data directory sizes, heartbeats and skips |
 | `/pi stats [player]` | List of tracked players / this month's summary for one player |
+| `/pi pd [player]` | Plugin data pulled through PlaceholderAPI (Paper's Delight cooking stats and effects) |
 | `/pi gen <daily\|monthly\|records> [date]` | Manually re-run an automatic report |
 | `/pi reload` | Reload the configuration |
 
@@ -91,6 +95,7 @@ plugins/PlayerInsight/
 │   ├── monthly/<player>-<month>-report.md        # player monthly report (19 sections)
 │   ├── monthly/<player>-<month>-summary.json     # machine-readable monthly summary
 │   ├── monthly/<player>-<month>-blocks.csv       # block statistics (broken/placed/ores)
+│   ├── monthly/<player>-<month>-integrations.json # plugin data via PlaceholderAPI (only when it resolves)
 │   └── monthly/<month>-all-players.md            # server-wide monthly summary
 ├── trail/                                   # trail text log (human-readable, rolled by period)
 │   └── 2026-09-21-20.log                    # time | player | world:X:Y:Z | held item | note
@@ -120,6 +125,7 @@ Every entry in `config.yml` is commented. Common switches:
 - `report.per-day-detail`: whether the monthly report includes the day-by-day table (on by default).
 - `move-log.interval-seconds` / `only-when-moved`: movement sampling interval and whether to record only while moving (5 s and moving-only by default).
 - `export.json` / `export.csv`: whether to also export machine-readable formats.
+- `integrations.placeholderapi.*`: plugin integrations through PlaceholderAPI (see section 10).
 - `player-record.interval-days`: generate a player record every N days.
 
 Write strategy: raw logs are buffered per player and per month and flushed every 40 lines or every
@@ -197,6 +203,22 @@ against a real server).
 9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
 10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
 
+### v2.1.1 update (2026-09-27): adapted to some plugins
+
+- New **plugin integration layer** built on a soft PlaceholderAPI dependency: other plugins' data can
+  now be shown in PlayerInsight commands and reports (see section 10). Without PlaceholderAPI nothing
+  changes and reports stay identical to v2.1.0.
+- Built-in profile for **Paper's Delight** (the plugin version of *Farmer's Delight*): cooking pot /
+  skillet / cutting board totals (offline-friendly) and the Nourishment / Comfort / Garlic effect state,
+  remaining time and total applications (online only).
+- New command `/pi pd [player]`; monthly reports gain a `附：插件数据（PlaceholderAPI，实时）` section
+  plus an `…-integrations.json` sidecar, both omitted when no data resolves.
+- Fixed the 1.21.11 `plugin.yml` **`api-version`**, which held the plugin version string instead of a
+  Minecraft API version (`2.1.0-1.21.11` → `1.21`).
+- Only the 1.21.11 build changes; the 1.12.2 build stays at 2.1.0.
+- New offline test `tests/IntegrationTest.java` (placeholder names, resolution rules, rendering and
+  report-section placement, 40 assertions).
+
 ### v2.1.0 update
 
 - Version numbers unified as `2.1.0-1.12.2` / `2.1.0-1.21.11`
@@ -266,7 +288,58 @@ human-readable trail log were folded into PlayerInsight:
    last heartbeat position and held item); the JSON summary gained `heartbeats` / `heartbeatsByHour` / `heldItems` / `lastHeartbeat`.
 9. **Tests**: new `tests/TrailLogTest.java` (line format, bucketing, BOM and cleanup — 24 assertions, run against both builds' output).
 
-## 10. License
+## 10. Plugin integrations (PlaceholderAPI)
+
+PlayerInsight can show data owned by *other* plugins by reading their
+[PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) placeholders — that is what
+"adapted to some plugins" means in v2.1.1. It is a **soft dependency**: with no PlaceholderAPI
+installed the whole integration layer stays off and the reports are byte-identical to v2.1.0.
+
+Built-in profile — **Paper's Delight** (the plugin version of *Farmer's Delight*):
+
+| Group | Data | Placeholder (as documented by Paper's Delight) |
+| --- | --- | --- |
+| Cooking pot | total dishes taken out | `%papersdelight_cooking_pot_cook_of_<player>%` |
+| Skillet | total items cooked | `%papersdelight_skillet_cook_of_<player>%` |
+| Cutting board | total cuts | `%papersdelight_cutting_board_cut_of_<player>%` |
+| Nourishment / Comfort / Garlic | active?, remaining time (M:SS), total applications | `%papersdelight_<player>_effect_<id>[_time_remaining_formatted\|_times]%` |
+
+The three cooking totals also resolve for **offline** players; the effect rows only resolve while the
+player is online. Where the data shows up:
+
+- `/pi pd [player]` prints the resolved values in game (no argument = yourself).
+- Monthly player reports get an extra section `## 附：插件数据（PlaceholderAPI，实时）` right before the
+  closing footer, plus a machine-readable `…-integrations.json` sidecar. Both are omitted entirely when
+  nothing resolves.
+
+These numbers are the plugin's own **lifetime counters**, so they are *not* a replay of the monthly
+JSONL and do not change when you run `/pi gen`. They are only resolved for players the server still has
+cached and are never fetched with a blocking web lookup.
+
+Adding other plugins:
+
+```yaml
+integrations:
+  placeholderapi:
+    enabled: true
+    report-section: true
+    export-json: true
+    papersdelight:
+      enabled: true
+    custom:
+      - group: "SomePlugin"
+        label: "Balance"
+        placeholder: "%someplugin_balance_{player}%"
+      - group: "SomePlugin"
+        label: "Daily streak"
+        placeholder: "%someplugin_streak_{player}%"
+        online-only: true
+```
+
+`{player}` is replaced with the player name. Rows whose placeholder is returned unchanged by
+PlaceholderAPI (plugin missing, or the placeholder does not exist) are silently dropped.
+
+## 11. License
 
 MIT License, see `LICENSE`.
 

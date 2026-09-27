@@ -23,10 +23,21 @@ public final class ReportGenerator {
     }
 
     public static String generate(PlayerStats s) {
-        return generate(s, null);
+        return generate(s, null, null);
     }
 
     public static String generate(PlayerStats s, Map<LocalDate, PlayerStats> perDay) {
+        return generate(s, perDay, null);
+    }
+
+    /**
+     * 生成月度报告。
+     *
+     * @param perDay       逐日明细，可为 null
+     * @param extraSection 追加章节（插件联动数据等），可为 null；为空时不产生任何输出，
+     *                     保证没有安装联动插件时报告与旧版本逐行一致
+     */
+    public static String generate(PlayerStats s, Map<LocalDate, PlayerStats> perDay, String extraSection) {
         StringBuilder b = new StringBuilder();
         header(b, s);
         overview(b, s);
@@ -48,6 +59,13 @@ public final class ReportGenerator {
         snapshotSection(b, s);
         dailyBreakdown(b, s, perDay);
         appendix(b, s);
+        if (extraSection != null && !extraSection.isEmpty()) {
+            b.append(extraSection);
+            if (!extraSection.endsWith("\n")) {
+                b.append("\n");
+            }
+            b.append("\n");
+        }
         b.append("---\n_PlayerInsight 报告结束。所有数值均可通过 data/&lt;uuid&gt;/&lt;yyyy-MM&gt;.jsonl 原始日志重新回放出。_\n");
         return b.toString();
     }

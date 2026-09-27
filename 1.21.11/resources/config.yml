@@ -128,3 +128,33 @@ export:
   json: true
   # 生成 CSV（便于 Excel 排序与统计）
   csv: true
+
+# ===== 插件联动（PlaceholderAPI）=====
+# 软依赖 PlaceholderAPI：没装 PlaceholderAPI 时本节所有功能自动关闭，
+# 不影响任何原有的事件记录、轨迹日志与报告。
+integrations:
+  placeholderapi:
+    # 总开关
+    enabled: true
+    # 在玩家月度报告末尾追加「附：插件数据（PlaceholderAPI，实时）」章节；
+    # 该章节来自插件自身的累计统计，不是本月日志回放，没有任何数据时不会输出
+    report-section: true
+    # 同时导出机器可读的边车文件 reports/monthly/<玩家>-<yyyy-MM>-integrations.json
+    export-json: true
+    # 内置档案：Paper's Delight（《农夫乐事》插件版）
+    # 读取它提供的 %papersdelight_*% 占位符，展示：
+    #   厨锅取出成品总次数 / 煎锅煎制总次数 / 砧板切制总次数（支持离线玩家）
+    #   滋养、舒适、大蒜三种效果的当前状态、剩余时间与累计施加次数（仅在线玩家）
+    papersdelight:
+      enabled: true
+    # 自定义条目：任何提供 PlaceholderAPI 占位符的插件都能接进来（这就是“适配插件”的通用入口）
+    # 例：
+    # custom:
+    #   - group: "ReLife · 经济"
+    #     label: "当前余额"
+    #     placeholder: "%relife_balance_{player}%"
+    #   - group: "示例插件"
+    #     label: "今日签到"
+    #     placeholder: "%someplugin_daily_sign_{player}%"
+    #     online-only: true   # 只有玩家在线时才解析
+    custom: []

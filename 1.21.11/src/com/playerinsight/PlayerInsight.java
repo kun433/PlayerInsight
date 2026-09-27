@@ -1,5 +1,8 @@
 package com.playerinsight;
 
+import com.playerinsight.integration.PlaceholderApi;
+import com.playerinsight.integration.PluginData;
+import com.playerinsight.integration.PluginIntegrations;
 import com.playerinsight.lib.gson.JsonObject;
 import com.playerinsight.model.PlayerStats;
 import com.playerinsight.report.DailyReportGenerator;
@@ -158,6 +161,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
 
     // 轨迹日志 / 定时心跳（参考 PlayerMoveLog）
     private TrailLog trail;
+    private PluginIntegrations integrations;
     private boolean trailEnabled = true;
     private int trailIntervalSeconds = 60;
     private int trailJsonlSeconds = 300;
@@ -279,6 +283,14 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
 
         getLogger().info("PlayerInsight 已启用（" + Compat.MINECRAFT_VERSION + " 版，" + Compat.PLATFORM_NOTE
                 + "）。数据目录: " + getDataFolder().getAbsolutePath());
+        if (this.integrations != null) {
+            if (this.integrations.active()) {
+                getLogger().info("插件联动已启用：" + this.integrations.getEntries().size()
+                        + " 个占位符条目（PlaceholderAPI）。");
+            } else {
+                getLogger().info("插件联动未启用：" + this.integrations.inactiveReason());
+            }
+        }
     }
 
     @Override
@@ -369,6 +381,11 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         this.filterExcludeWorlds.addAll(getConfig().getStringList("filter.exclude-worlds"));
         this.filterExcludePlayers.clear();
         this.filterExcludePlayers.addAll(getConfig().getStringList("filter.exclude-players"));
+
+        // ===== 插件联动（PlaceholderAPI）=====
+        // 每次重载都重新探测，方便服务器后装 PlaceholderAPI 后直接 /pi reload。
+        PlaceholderApi.reset();
+        this.integrations = PluginIntegrations.load(this);
     }
 
     private void loadState() {
@@ -1767,8 +1784,10 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
                 continue;
             }
             byPlayer.put(name, stats);
+            PluginData pluginData = integrationData(name);
             writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-report.md"),
-                    ReportGenerator.generate(stats, perDay));
+                    ReportGenerator.generate(stats, perDay, pluginData.markdown()));
+            writeIntegrationJson(new File(getDataFolder(), "reports/monthly"), name + "-" + yyyyMM, pluginData);
             if (this.exportJson) {
                 writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-summary.json"),
                         DataExport.monthlyJson(stats));
@@ -1886,7 +1905,9 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         if ("reload".equals(sub)) {
             reloadConfig();
             loadRecordConfig();
-            sender.sendMessage("§a[PI] 配置已重载。");
+            sender.sendMessage("§a[PI] 配置已重载。" + (integrations != null && integrations.active()
+                    ? " §7插件联动：已启用（" + integrations.getEntries().size() + " 个占位符）"
+                    : " §7插件联动：未启用（" + (integrations == null ? "未加载" : integrations.inactiveReason()) + "）"));
             return true;
         }
         if ("stats".equals(sub)) {
@@ -1906,6 +1927,27 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
                             + (last > 0L ? Text.dateTime(last) : "未知"));
                 }
             }
+            return true;
+        }
+        if ("pd".equals(sub) || "plugin".equals(sub)) {
+            String name;
+            if (args.length >= 2) {
+                String uuid = resolveTarget(args[1]);
+                if (uuid == null) {
+                    sender.sendMessage("§c[PI] 找不到玩家: " + args[1]);
+                    return true;
+                }
+                name = store.nameOf(uuid);
+                if (name == null || name.isEmpty()) {
+                    name = args[1];
+                }
+            } else if (sender instanceof Player) {
+                name = ((Player) sender).getName();
+            } else {
+                sender.sendMessage("§a用法: /playerinsight pd [玩家]");
+                return true;
+            }
+            printPluginData(sender, name);
             return true;
         }
         if ("report".equals(sub)) {
@@ -2361,6 +2403,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         sender.sendMessage("§a/pi trace <玩家> [页码] §7- 分页查询轨迹日志");
         sender.sendMessage("§a/pi status §7- 运行状态（TPS/在线/目录大小/心跳）");
         sender.sendMessage("§a/pi stats [玩家] §7- 查看已记录玩家 / 玩家摘要");
+        sender.sendMessage("§a/pi pd [玩家] §7- 查看插件数据（Paper's Delight 等，需 PlaceholderAPI）");
         sender.sendMessage("§a/pi gen <daily|monthly|records> [日期] §7- 手动重新生成报告");
         sender.sendMessage("§a/pi reload §7- 重载配置");
     }
@@ -2382,7 +2425,9 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
             return null;
         }
         File out = new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-report.md");
-        writeReport(out, ReportGenerator.generate(stats, perDay));
+        PluginData pluginData = integrationData(name);
+        writeReport(out, ReportGenerator.generate(stats, perDay, pluginData.markdown()));
+        writeIntegrationJson(new File(getDataFolder(), "reports/monthly"), name + "-" + yyyyMM, pluginData);
         if (this.exportJson) {
             writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-summary.json"),
                     DataExport.monthlyJson(stats));
@@ -2392,6 +2437,40 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
                     DataExport.blocksCsv(stats));
         }
         return out;
+    }
+
+    /**
+     * 解析某玩家的插件联动数据；未启用/不可用时返回空结果（报告里不会多出章节）。
+     *
+     * <p>自动月报是在异步线程里跑的，而 PlaceholderAPI 的扩展不保证线程安全，
+     * 因此非主线程时切回主线程解析；拿不到结果就整节跳过，不影响报告本身。
+     */
+    private PluginData integrationData(final String playerName) {
+        if (this.integrations == null || !this.integrations.isReportSection() || !this.integrations.active()) {
+            return new PluginData(playerName);
+        }
+        if (Bukkit.isPrimaryThread()) {
+            return this.integrations.resolve(playerName);
+        }
+        try {
+            return Bukkit.getScheduler().callSyncMethod(this, new java.util.concurrent.Callable<PluginData>() {
+                @Override
+                public PluginData call() {
+                    return integrations.resolve(playerName);
+                }
+            }).get(10L, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Throwable t) {
+            getLogger().warning("PlayerInsight: 插件联动数据解析失败（" + playerName + "）: " + t.getMessage());
+            return new PluginData(playerName);
+        }
+    }
+
+    /** 需要时写出插件联动的 JSON 边车文件（reports/monthly/<玩家>-<yyyy-MM>-integrations.json）。 */
+    private void writeIntegrationJson(File dir, String baseName, PluginData data) {
+        if (this.integrations == null || !this.integrations.isExportJson() || data == null || data.isEmpty()) {
+            return;
+        }
+        writeReport(new File(dir, baseName + "-integrations.json"), data.toJson());
     }
 
     private void printPlayerSummary(CommandSender sender, String target) {
@@ -2413,6 +2492,30 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
                 + " | 聊天 " + month.getChatCount() + " | 指令 " + month.getCommandCount()
                 + " | 容器 " + month.getContainerOpens());
         sender.sendMessage("§7挖得最多: " + DailyReportGenerator.inlineTop(month.getMinedByMaterial(), 8));
+    }
+
+    /**
+     * 输出某个玩家的插件联动数据（例如 Paper's Delight 的烹饪统计与效果状态）。
+     *
+     * <p>数据由 PlaceholderAPI 现场解析，属于插件自身的累计统计，与本月日志无关。
+     */
+    private void printPluginData(CommandSender sender, String playerName) {
+        if (this.integrations == null || !this.integrations.active()) {
+            sender.sendMessage("§c[PI] 插件联动未启用："
+                    + (this.integrations == null ? "配置未加载" : this.integrations.inactiveReason()));
+            return;
+        }
+        PluginData data = this.integrations.resolve(playerName);
+        if (data.isEmpty()) {
+            sender.sendMessage("§7[PI] 未解析到 " + playerName + " 的插件数据（可能未安装对应插件、"
+                    + "占位符不可用，或该玩家不在服务器缓存中）。");
+            return;
+        }
+        sender.sendMessage("§6===== 插件数据 · " + playerName + " =====");
+        for (String line : data.plainLines()) {
+            sender.sendMessage(line);
+        }
+        sender.sendMessage("§7（共 " + data.groupCount() + " 组 / " + data.size() + " 项，来源：PlaceholderAPI）");
     }
 
     private void printBlocks(CommandSender sender, String target, String scope) {
