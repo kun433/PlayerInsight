@@ -1,4 +1,4 @@
-﻿# 一键重建两个版本并做一致性回放（-4）
+﻿# 一键重建两个版本并做一致性回放（共享代码同步 + 完整性守卫）
 $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)   # tests/ 的上一级 = 项目根
 $v12 = "$root\1.12.2"; $v21 = "$root\1.21.11"
@@ -33,30 +33,39 @@ function Build($base, $javac, $jar, $cp, $jarName) {
     Write-Host ("OK " + $jarName + " " + (Get-Item "$base\dist\$jarName").Length)
 }
 
-# 1) 共享文件同步（保留 1.21.11 的 Compat.java）
+# 1) 共享文件同步：1.12.2 是共享代码的来源，但只同步两版应当逐字相同的文件。
+#
+#    下面三类文件两版**故意不同**，绝不能覆盖，否则会把 1.21.11 的插件联动层弄丢：
+#      - src/com/playerinsight/PlayerInsight.java         （1.21.11 多整套插件联动层与 /pi pd）
+#      - src/com/playerinsight/report/ReportGenerator.java（1.21.11 多 extraSection 重载）
+#      - resources/config.yml                            （1.21.11 多 integrations 段落）
+#    另外各版本的 Compat.java 本来就是版本相关，也不参与同步。
 Copy-Item -Force "$v12\src\com\playerinsight\model\PlayerStats.java" "$v21\src\com\playerinsight\model\"
-Copy-Item -Recurse -Force "$v12\src\com\playerinsight\report\*" "$v21\src\com\playerinsight\report\"
+Copy-Item -Force "$v12\src\com\playerinsight\report\DailyReportGenerator.java" "$v21\src\com\playerinsight\report\"
+Copy-Item -Force "$v12\src\com\playerinsight\report\DataExport.java" "$v21\src\com\playerinsight\report\"
+Copy-Item -Force "$v12\src\com\playerinsight\report\RecordGenerator.java" "$v21\src\com\playerinsight\report\"
 Copy-Item -Recurse -Force "$v12\src\com\playerinsight\store\*" "$v21\src\com\playerinsight\store\"
 Copy-Item -Recurse -Force "$v12\src\com\playerinsight\util\*" "$v21\src\com\playerinsight\util\"
-Copy-Item -Force "$v12\resources\config.yml" "$v21\resources\config.yml"
-# 主类同步 + 重新套聊天补丁
-$mf = "$v21\src\com\playerinsight\PlayerInsight.java"
-$utf8 = New-Object System.Text.UTF8Encoding($false)
-$m = ([IO.File]::ReadAllText("$v12\src\com\playerinsight\PlayerInsight.java")) -replace "`r`n","`n"
-$m = $m.Replace("import org.bukkit.event.player.AsyncPlayerChatEvent;`n",
-    "import io.papermc.paper.event.player.AsyncChatEvent;`nimport net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;`n")
-$old = "    public void onChat(AsyncPlayerChatEvent e) {"
-$new = "    public void onChat(AsyncChatEvent e) {"
-if (-not $m.Contains($old)) { throw "聊天事件补丁未匹配" }
-$m = $m.Replace($old, $new)
-$m = $m.Replace("o.addProperty(`"msg`", e.getMessage());", "o.addProperty(`"msg`", PlainTextComponentSerializer.plainText().serialize(e.message()));")
-[IO.File]::WriteAllText($mf, $m, $utf8)
 
-# 2) 编译打包
-Build $v12 $javac11 $jar11 $cp12 "PlayerInsight-2.1.0-1.12.2.jar"
-Build $v21 $javac21 $jar21 $cp21 "PlayerInsight-2.1.0-1.21.11.jar"
+# 2) 完整性守卫：1.21.11 独有的联动层必须还在，否则这次打包会把功能悄悄弄丢（宁可直接失败）
+$guard = @{
+    "$v21\src\com\playerinsight\integration\PluginIntegrations.java" = "slimefunEntries"
+    "$v21\src\com\playerinsight\integration\PlaceholderApi.java"     = "setPlaceholders"
+    "$v21\src\com\playerinsight\integration\PluginData.java"         = "markdown"
+    "$v21\src\com\playerinsight\PlayerInsight.java"                  = "PluginIntegrations"
+    "$v21\src\com\playerinsight\report\ReportGenerator.java"         = "extraSection"
+    "$v21\resources\config.yml"                                      = "integrations:"
+}
+foreach ($f in $guard.Keys) {
+    if (-not (Test-Path $f)) { throw "缺少 1.21.11 独有文件: $f" }
+    if (-not ([IO.File]::ReadAllText($f).Contains($guard[$f]))) { throw "1.21.11 独有文件被覆盖或损坏: $f" }
+}
 
-# 3) 一致性回放
+# 3) 编译打包
+Build $v12 $javac11 $jar11 $cp12 "PlayerInsight-2.1.2-1.12.2.jar"
+Build $v21 $javac21 $jar21 $cp21 "PlayerInsight-2.1.2-1.21.11.jar"
+
+# 4) 一致性回放
 & $javac11 -encoding UTF-8 -classpath $cp12 -d "$root\tests" "$root\tests\ReplayHarness.java"
 $sample = "$root\tests\sample-v5-trail.jsonl"
 & $java11 -classpath "$root\tests;$cp12" ReplayHarness $sample "$root\tests\out\v4-12" --by-name "2026-09" "2026-09-17" | Out-Null

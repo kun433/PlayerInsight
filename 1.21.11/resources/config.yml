@@ -147,6 +147,15 @@ integrations:
     #   滋养、舒适、大蒜三种效果的当前状态、剩余时间与累计施加次数（仅在线玩家）
     papersdelight:
       enabled: true
+    # 内置档案：Slimefun（《粘液科技》）
+    # 读取它提供的 %slimefun_*% 占位符（据 Slimefun 中文 Wiki 的 PlaceholderAPI 页面），展示：
+    #   研究：可解锁研究总数（全服）、已解锁研究数量、已解锁百分比、解锁累计消耗等级、研究头衔
+    #   杂项：GPS 网络复杂度、Slimefun 语言（仅在线玩家）、全服活动累计耗时
+    # 这些占位符不带玩家名参数，由 PlaceholderAPI 把当前查询的玩家传进去。
+    # 研究类的 4 个数值来自玩家档案：档案尚未载入时（常见于离线玩家）Slimefun 会返回
+    # “档案载入中”的提示文本，PlayerInsight 会把它当成未解析丢弃，而不是写进报告。
+    slimefun:
+      enabled: true
     # 自定义条目：任何提供 PlaceholderAPI 占位符的插件都能接进来（这就是“适配插件”的通用入口）
     # 例：
     # custom:
@@ -157,4 +166,8 @@ integrations:
     #     label: "今日签到"
     #     placeholder: "%someplugin_daily_sign_{player}%"
     #     online-only: true   # 只有玩家在线时才解析
+    #   - group: "示例插件"
+    #     label: "累计矿石"
+    #     placeholder: "%someplugin_ores_{player}%"
+    #     numeric: true       # 要求返回值是数字，插件返回提示文本时按“未解析”丢弃
     custom: []

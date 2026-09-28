@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.1 — Detailed Player Activity Logging Plugin
+# PlayerInsight v2.1.2 — Detailed Player Activity Logging Plugin
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -9,11 +9,13 @@ The same feature set is built as two separate artifacts:
 
 | Build | Target platform | Bytecode | Artifact |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.1-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.2-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.2-1.21.11.jar` |
 
-v2.1.1 only touches the 1.21.11 build (the new plugin integration needs PlaceholderAPI, which is only
-relevant on 1.21.x); the 1.12.2 build is unchanged and stays at 2.1.0.
+v2.1.2 only touches the 1.21.11 build: the plugin integration layer gains a built-in **Slimefun** profile
+(see section 10). The 1.12.2 build has **no functional change** in this release; it only follows the
+release number to `2.1.2`, so the two artifacts no longer sit two versions apart. Its behaviour is
+identical to 2.1.0 (it carries no integration layer at all).
 
 Both builds share identical events, data structures and report formats (the same `PlayerStats` /
 `ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
@@ -45,7 +47,7 @@ reading old files and includes the old format in its reports.
 | `/pi trace <player> [page]` | Paged trail log lookup (10 rows per page, newest first) |
 | `/pi status` | Runtime status: switches, TPS, online count, trail/data directory sizes, heartbeats and skips |
 | `/pi stats [player]` | List of tracked players / this month's summary for one player |
-| `/pi pd [player]` | Plugin data pulled through PlaceholderAPI (Paper's Delight cooking stats and effects) |
+| `/pi pd [player]` | Plugin data pulled through PlaceholderAPI (Paper's Delight cooking stats and effects, Slimefun research progress) |
 | `/pi gen <daily\|monthly\|records> [date]` | Manually re-run an automatic report |
 | `/pi reload` | Reload the configuration |
 
@@ -203,6 +205,26 @@ against a real server).
 9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
 10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
 
+### v2.1.2 update (2026-09-28): adapted to Slimefun
+
+- The integration layer gained a built-in **Slimefun** profile: all 8 `%slimefun_*%` placeholders from
+  the [Slimefun wiki PlaceholderAPI page](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/) are wired in
+  (total researches / unlocked researches / unlocked percentage / XP levels spent / research title,
+  GPS network complexity, Slimefun language, accumulated activity time).
+- New config switch `integrations.placeholderapi.slimefun.enabled` (on by default).
+- New per-entry **`numeric` validation**: numeric metrics must return a parseable number. While a
+  player's Slimefun profile is not loaded yet (common for offline players) Slimefun returns a
+  "profile loading" notice instead of a number; such a value is treated as unresolved and dropped
+  rather than written into the report. Custom entries can opt in with `numeric: true`.
+- Only the 1.21.11 build changes; the 1.12.2 build has no functional change and only follows the
+  release number to `2.1.2-1.12.2`.
+- `tests/IntegrationTest.java` gained assertions for the Slimefun placeholder names, `{player}`-free
+  templates, the online-only flag and `numeric` filtering (85 assertions in the file, all passing).
+- Fixed a latent hazard in `tests/build-both.ps1`: it used to copy the 1.12.2 `config.yml` and main
+  class over the 1.21.11 ones, so a single run would wipe the whole 1.21.11 integration layer (true
+  since v2.1.1). It now synchronises only the genuinely shared files and adds an integrity guard that
+  fails loudly if the integration layer is missing instead of silently packaging a stripped jar.
+
 ### v2.1.1 update (2026-09-27): adapted to some plugins
 
 - New **plugin integration layer** built on a soft PlaceholderAPI dependency: other plugins' data can
@@ -292,7 +314,7 @@ human-readable trail log were folded into PlayerInsight:
 
 PlayerInsight can show data owned by *other* plugins by reading their
 [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) placeholders — that is what
-"adapted to some plugins" means in v2.1.1. It is a **soft dependency**: with no PlaceholderAPI
+"adapted to some plugins" has meant since v2.1.1. It is a **soft dependency**: with no PlaceholderAPI
 installed the whole integration layer stays off and the reports are byte-identical to v2.1.0.
 
 Built-in profile — **Paper's Delight** (the plugin version of *Farmer's Delight*):
@@ -305,7 +327,37 @@ Built-in profile — **Paper's Delight** (the plugin version of *Farmer's Deligh
 | Nourishment / Comfort / Garlic | active?, remaining time (M:SS), total applications | `%papersdelight_<player>_effect_<id>[_time_remaining_formatted\|_times]%` |
 
 The three cooking totals also resolve for **offline** players; the effect rows only resolve while the
-player is online. Where the data shows up:
+player is online.
+
+Built-in profile — **Slimefun** (placeholders per the
+[Chinese wiki PlaceholderAPI page](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/)):
+
+| Group | Data | Placeholder |
+| --- | --- | --- |
+| Research | total amount of researches (**server-wide**) | `%slimefun_researches_total_researches%` |
+| Research | amount of unlocked researches | `%slimefun_researches_total_researches_unlocked%` |
+| Research | percentage of unlocked researches | `%slimefun_researches_percentage_researches_unlocked%` |
+| Research | total XP levels spent on unlocks | `%slimefun_researches_total_xp_levels_spent%` |
+| Research | research title | `%slimefun_researches_title%` |
+| Misc | GPS network complexity | `%slimefun_gps_complexity%` |
+| Misc | Slimefun language (online only) | `%slimefun_language%` |
+| Misc | accumulated activity time (**server-wide**) | `%slimefun_timings_lag%` |
+
+Unlike Paper's Delight these placeholders take **no player-name argument**: PlaceholderAPI passes the
+player being resolved, so the templates carry no `{player}` — the player queried is still the one named
+by `/pi pd` or the report.
+
+Three behaviours are easy to get wrong, so the plugin handles them explicitly:
+
+- `%slimefun_researches_total_researches%` and `%slimefun_timings_lag%` are **server-wide** values,
+  identical in every player's report. Their labels say so, so they are not read as personal data.
+- Unlocked researches / percentage / XP levels spent / research title come from the player's
+  Slimefun **profile**. While that profile is not loaded (common for offline players) Slimefun returns
+  a "profile loading" notice instead of a number. Those rows therefore require a numeric value;
+  anything non-numeric is dropped as unresolved, so the row is missing rather than wrong.
+- `%slimefun_language%` only resolves for online players, so it is flagged online-only.
+
+Where the data shows up:
 
 - `/pi pd [player]` prints the resolved values in game (no argument = yourself).
 - Monthly player reports get an extra section `## 附：插件数据（PlaceholderAPI，实时）` right before the
@@ -326,6 +378,8 @@ integrations:
     export-json: true
     papersdelight:
       enabled: true
+    slimefun:
+      enabled: true
     custom:
       - group: "SomePlugin"
         label: "Balance"
@@ -334,10 +388,17 @@ integrations:
         label: "Daily streak"
         placeholder: "%someplugin_streak_{player}%"
         online-only: true
+      - group: "SomePlugin"
+        label: "Ores mined"
+        placeholder: "%someplugin_ores_{player}%"
+        numeric: true
 ```
 
-`{player}` is replaced with the player name. Rows whose placeholder is returned unchanged by
-PlaceholderAPI (plugin missing, or the placeholder does not exist) are silently dropped.
+`{player}` is replaced with the player name (placeholders such as Slimefun's that receive the player
+from PlaceholderAPI are written as-is); `online-only: true` resolves only while the player is online;
+`numeric: true` requires a number, so notices and other text are dropped as unresolved; rows whose
+placeholder is returned unchanged by PlaceholderAPI (plugin missing, or the placeholder does not
+exist) are silently dropped.
 
 ## 11. License
 

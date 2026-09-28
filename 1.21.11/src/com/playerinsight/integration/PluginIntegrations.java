@@ -15,9 +15,15 @@ import org.bukkit.plugin.java.JavaPlugin;
  * <ul>
  *   <li>{@code papersdelight.enabled}：内置的《农夫乐事》插件版（Paper's Delight）档案，
  *       读取它公布的 {@code %papersdelight_*%} 占位符；</li>
+ *   <li>{@code slimefun.enabled}：内置的《粘液科技》（Slimefun）档案，
+ *       读取它公布的 {@code %slimefun_*%} 占位符；</li>
  *   <li>{@code custom}：自定义条目，任何插件只要提供 PlaceholderAPI 占位符都能接进来，
  *       这就是“适配一些插件”的通用入口。</li>
  * </ul>
+ *
+ * <p>条目分两种写法：带 {@code {player}} 的模板（占位符自己接收玩家名，例如 Paper's Delight）
+ * 与不带 {@code {player}} 的模板（玩家由 PlaceholderAPI 在解析时传入，例如 Slimefun）。两者都
+ * 只对 {@code resolve(玩家名)} 指定的那名玩家生效。
  *
  * <p>解析只使用非阻塞的玩家对象：在线用 {@code getPlayerExact}，离线用 {@code getOfflinePlayerIfCached}，
  * 避免在异步任务里触发同步联网查询；玩家不在缓存中就跳过。
@@ -30,12 +36,18 @@ public final class PluginIntegrations {
         private final String label;
         private final String template;
         private final boolean onlineOnly;
+        private final boolean numeric;
 
         Entry(String group, String label, String template, boolean onlineOnly) {
+            this(group, label, template, onlineOnly, false);
+        }
+
+        Entry(String group, String label, String template, boolean onlineOnly, boolean numeric) {
             this.group = group;
             this.label = label;
             this.template = template;
             this.onlineOnly = onlineOnly;
+            this.numeric = numeric;
         }
 
         public String getGroup() {
@@ -52,6 +64,11 @@ public final class PluginIntegrations {
 
         public boolean isOnlineOnly() {
             return onlineOnly;
+        }
+
+        /** 该指标是否必须是数字（非数字的返回值视为未解析）。 */
+        public boolean isNumeric() {
+            return numeric;
         }
     }
 
@@ -86,6 +103,9 @@ public final class PluginIntegrations {
         if (plugin.getConfig().getBoolean("integrations.placeholderapi.papersdelight.enabled", true)) {
             entries.addAll(paperDelightEntries());
         }
+        if (plugin.getConfig().getBoolean("integrations.placeholderapi.slimefun.enabled", true)) {
+            entries.addAll(slimefunEntries());
+        }
         for (Map<?, ?> raw : plugin.getConfig().getMapList("integrations.placeholderapi.custom")) {
             Object placeholder = raw.get("placeholder");
             if (placeholder == null || String.valueOf(placeholder).trim().isEmpty()) {
@@ -97,7 +117,8 @@ public final class PluginIntegrations {
                     group == null ? "自定义插件数据" : String.valueOf(group),
                     label == null ? String.valueOf(placeholder) : String.valueOf(label),
                     String.valueOf(placeholder),
-                    Boolean.parseBoolean(String.valueOf(raw.get("online-only")))));
+                    Boolean.parseBoolean(String.valueOf(raw.get("online-only"))),
+                    Boolean.parseBoolean(String.valueOf(raw.get("numeric")))));
         }
         return new PluginIntegrations(enabled, reportSection, exportJson, entries);
     }
@@ -135,6 +156,55 @@ public final class PluginIntegrations {
     static List<Entry> paperDelightEntries() {
         List<Entry> out = new ArrayList<Entry>();
         addPaperDelight(out);
+        return out;
+    }
+
+    /**
+     * Slimefun（《粘液科技》）内置档案。
+     *
+     * <p>占位符全部取自 Slimefun 中文 Wiki 的 PlaceholderAPI 页面
+     * （{@code https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/}）。与 Paper's Delight 不同，
+     * 这些占位符**不带玩家名参数**：玩家由 PlaceholderAPI 在解析时传入，所以模板里没有
+     * {@code {player}}。
+     *
+     * <p>注意两处与直觉不同、并已在代码里做了相应处理的行为：
+     * <ul>
+     *   <li>{@code %slimefun_researches_total_researches%}（可解锁研究总数）与
+     *       {@code %slimefun_timings_lag%}（活动累计耗时）是**全服**值，与查询哪名玩家无关；
+     *       它们的标签里已标明“全服”，避免被读成个人数据；</li>
+     *   <li>研究类中的已解锁数量 / 百分比 / 累计消耗等级 / 研究头衔来自玩家档案：
+     *       档案尚未载入时（常见于离线玩家），Slimefun 会返回一条“档案载入中”的提示文本而不是数字。
+     *       因此这几个数值类指标标为 {@code numeric}，非数字的返回值会被当成未解析丢弃，
+     *       而不会把提示文本写进报告。</li>
+     * </ul>
+     *
+     * <p>{@code %slimefun_timings_lag%} 返回的是形如 {@code 1234ms} 的文本，不是纯数字，
+     * 所以不标 {@code numeric}；{@code %slimefun_language%} 只对在线玩家有意义，标为仅在线。
+     */
+    private static void addSlimefun(List<Entry> out) {
+        out.add(new Entry("Slimefun · 研究", "可解锁研究总数（全服）",
+                "%slimefun_researches_total_researches%", false, true));
+        out.add(new Entry("Slimefun · 研究", "已解锁研究数量",
+                "%slimefun_researches_total_researches_unlocked%", false, true));
+        out.add(new Entry("Slimefun · 研究", "已解锁百分比",
+                "%slimefun_researches_percentage_researches_unlocked%", false, true));
+        out.add(new Entry("Slimefun · 研究", "解锁累计消耗等级",
+                "%slimefun_researches_total_xp_levels_spent%", false, true));
+        out.add(new Entry("Slimefun · 研究", "研究头衔",
+                "%slimefun_researches_title%", false));
+
+        out.add(new Entry("Slimefun · 杂项", "GPS 网络复杂度",
+                "%slimefun_gps_complexity%", false, true));
+        out.add(new Entry("Slimefun · 杂项", "Slimefun 语言",
+                "%slimefun_language%", true));
+        out.add(new Entry("Slimefun · 杂项", "全服活动累计耗时",
+                "%slimefun_timings_lag%", false));
+    }
+
+    /** Slimefun 档案的条目列表（包内可见，便于离线测试校对占位符名）。 */
+    static List<Entry> slimefunEntries() {
+        List<Entry> out = new ArrayList<Entry>();
+        addSlimefun(out);
         return out;
     }
 
@@ -217,11 +287,35 @@ public final class PluginIntegrations {
             }
             String placeholder = entry.template.replace("{player}", playerName);
             String value = resolver.resolve(placeholder);
-            if (isResolvedValue(placeholder, value)) {
-                data.put(entry.group, entry.label, value.trim());
+            if (!isResolvedValue(placeholder, value)) {
+                continue;
             }
+            String trimmed = value.trim();
+            // 数值类指标额外要求返回值是数字：Slimefun 在玩家档案尚未载入时会返回
+            // 一条“档案载入中”的提示文本，这种值不算解析成功。
+            if (entry.numeric && !isNumericValue(trimmed)) {
+                continue;
+            }
+            data.put(entry.group, entry.label, trimmed);
         }
         return data;
+    }
+
+    /** 返回值是否是一个可解析的数字（用于 {@code numeric} 条目）。 */
+    static boolean isNumericValue(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        try {
+            Double.parseDouble(trimmed);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**

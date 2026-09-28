@@ -2403,7 +2403,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         sender.sendMessage("§a/pi trace <玩家> [页码] §7- 分页查询轨迹日志");
         sender.sendMessage("§a/pi status §7- 运行状态（TPS/在线/目录大小/心跳）");
         sender.sendMessage("§a/pi stats [玩家] §7- 查看已记录玩家 / 玩家摘要");
-        sender.sendMessage("§a/pi pd [玩家] §7- 查看插件数据（Paper's Delight 等，需 PlaceholderAPI）");
+        sender.sendMessage("§a/pi pd [玩家] §7- 查看插件数据（Paper's Delight / Slimefun 等，需 PlaceholderAPI）");
         sender.sendMessage("§a/pi gen <daily|monthly|records> [日期] §7- 手动重新生成报告");
         sender.sendMessage("§a/pi reload §7- 重载配置");
     }
@@ -2495,7 +2495,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
     }
 
     /**
-     * 输出某个玩家的插件联动数据（例如 Paper's Delight 的烹饪统计与效果状态）。
+     * 输出某个玩家的插件联动数据（例如 Paper's Delight 的烹饪统计与效果状态、Slimefun 的研究进度）。
      *
      * <p>数据由 PlaceholderAPI 现场解析，属于插件自身的累计统计，与本月日志无关。
      */

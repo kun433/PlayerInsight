@@ -1,9 +1,10 @@
 # PlayerInsight 插件联动层的离线测试（不需要服务器、不需要 PlaceholderAPI）。
 # 编译并运行 tests/IntegrationTest.java，校验：
 #   1) 内置 Paper's Delight 档案的占位符名与官方文档逐条一致
-#   2) 解析规则（{player} 替换、在线限定、未解析/空值/null 丢弃）
-#   3) PluginData 的 Markdown / JSON / 指令行渲染
-#   4) 报告章节只在其有数据时追加，未启用联动时报告与旧版逐行一致
+#   2) 内置 Slimefun 档案的占位符名与官方文档逐条一致（模板不带 {player}）
+#   3) 解析规则（{player} 替换、在线限定、未解析/空值/null 丢弃、numeric 数值校验）
+#   4) PluginData 的 Markdown / JSON / 指令行渲染
+#   5) 报告章节只在其有数据时追加，未启用联动时报告与旧版逐行一致
 #
 # 用法：在 PowerShell 中执行  .\integration-test.ps1
 # 需要：JDK 21（与 1.21.11 构建一致）；先跑过 1.21.11\build.ps1

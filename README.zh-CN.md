@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.1 — 详细玩家行为记录插件
+# PlayerInsight v2.1.2 — 详细玩家行为记录插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -8,11 +8,12 @@
 
 | 构建 | 目标平台 | 字节码 | 产物 |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.1-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.2-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.2-1.21.11.jar` |
 
-v2.1.1 只动 1.21.11 构建（新的插件联动需要 PlaceholderAPI，只在 1.21.x 上有意义）；
-1.12.2 构建没有改动，仍为 2.1.0。
+v2.1.2 只动 1.21.11 构建：插件联动层新增 **Slimefun（《粘液科技》）** 内置档案（见第十节）。
+1.12.2 构建本次**没有功能改动**，只把版本号跟随发布号升到 `2.1.2`，让两个产物不再长期停在不同的版本号上；
+它的功能与 2.1.0 逐字一致（1.12.2 上本来就没有插件联动层）。
 
 两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
 只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
@@ -42,7 +43,7 @@ v2.1.1 只动 1.21.11 构建（新的插件联动需要 PlaceholderAPI，只在 
 | `/pi trace <玩家> [页码]` | 分页查询轨迹日志（每页 10 条，时间倒序） |
 | `/pi status` | 运行状态：各类开关、TPS、在线人数、轨迹/数据目录大小、心跳与跳过次数 |
 | `/pi stats [玩家]` | 已记录玩家列表 / 单个玩家本月摘要 |
-| `/pi pd [玩家]` | 查看插件数据（经 PlaceholderAPI，如 Paper's Delight 的烹饪统计与效果） |
+| `/pi pd [玩家]` | 查看插件数据（经 PlaceholderAPI，如 Paper's Delight 的烹饪统计与效果、Slimefun 的研究进度） |
 | `/pi gen <daily\|monthly\|records> [日期]` | 手动重跑自动报告 |
 | `/pi reload` | 重载配置 |
 
@@ -194,6 +195,22 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 9. 新增 `players.yml` 玩家索引与历史日志补全，离线玩家可查、可读。
 10. 兼容 v1 的旧日志（包括旧版把拾取/丢弃/食用写成 `BLOCK` 事件的情况）。
 
+### v2.1.2 更新（2026-09-28）：适配 Slimefun（粘液科技）
+
+- 插件联动层新增内置档案 **Slimefun**：按 [粘液科技中文 Wiki 的 PlaceholderAPI 页面](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/)
+  接入全部 8 个 `%slimefun_*%` 占位符（研究总数 / 已解锁数量 / 百分比 / 解锁累计消耗等级 / 研究头衔、
+  GPS 网络复杂度、Slimefun 语言、全服活动累计耗时）。
+- 新增配置开关 `integrations.placeholderapi.slimefun.enabled`（默认开）。
+- 新增条目的 **`numeric` 数值校验**：数值类指标要求返回值能解析为数字。Slimefun 的玩家档案尚未载入时
+  （对离线玩家很常见）会返回一条“档案载入中”的提示文本，这类返回值会被当作未解析丢弃，
+  不会把提示文本写进报告；自定义条目同样可以用 `numeric: true`。
+- 只改 1.21.11 构建；1.12.2 构建本次**无功能改动**，仅把版本号升到 `2.1.2-1.12.2`。
+- `tests/IntegrationTest.java` 新增 Slimefun 占位符名、模板不带 `{player}`、仅在线限定与 `numeric`
+  过滤断言（文件内共 85 条断言，全部通过）。
+- 修掉 `tests/build-both.ps1` 的隐患：它原来会把 1.12.2 的 `config.yml` 与主类覆盖到 1.21.11，
+  跑一次就会删掉 1.21.11 的整套插件联动层（v2.1.1 起就处于这种状态）。现在只同步真正共享的文件，
+  并加了一道完整性守卫：联动层被覆盖或缺失时直接报错，而不是静默打出残缺的 jar。
+
 ### v2.1.1 更新（2026-09-27）：适配了一些插件
 
 - 新增**插件联动层**，软依赖 PlaceholderAPI：其他插件的数据现在可以展现在 PlayerInsight 的指令与报告里
@@ -275,7 +292,7 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 ## 十、插件联动（PlaceholderAPI）
 
 PlayerInsight 可以读取**其他插件**的数据：通过 [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/)
-占位符把它们展示到指令与报告里——这就是 v2.1.1 “适配了一些插件”的含义。它是**软依赖**：
+占位符把它们展示到指令与报告里——这就是 v2.1.1 起“适配了一些插件”的含义。它是**软依赖**：
 没装 PlaceholderAPI 时整个联动层自动关闭，报告与 v2.1.0 逐字一致。
 
 内置档案 —— **Paper's Delight**（《农夫乐事》插件版）：
@@ -287,7 +304,34 @@ PlayerInsight 可以读取**其他插件**的数据：通过 [PlaceholderAPI](ht
 | 砧板 | 切制总次数 | `%papersdelight_cutting_board_cut_of_<玩家名>%` |
 | 滋养 / 舒适 / 大蒜 | 是否生效、剩余时间（M:SS）、累计施加次数 | `%papersdelight_<玩家名>_effect_<效果>[_time_remaining_formatted\|_times]%` |
 
-三个厨具计数对**离线玩家**同样有效；效果类只在玩家在线时能解析。数据出现的位置：
+三个厨具计数对**离线玩家**同样有效；效果类只在玩家在线时能解析。
+
+内置档案 —— **Slimefun**（《粘液科技》，占位符按 [中文 Wiki 的 PlaceholderAPI 页面](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/)）：
+
+| 分组 | 数据 | 占位符 |
+| --- | --- | --- |
+| 研究 | 可解锁研究总数（**全服**值） | `%slimefun_researches_total_researches%` |
+| 研究 | 已解锁研究数量 | `%slimefun_researches_total_researches_unlocked%` |
+| 研究 | 已解锁百分比 | `%slimefun_researches_percentage_researches_unlocked%` |
+| 研究 | 解锁累计消耗等级 | `%slimefun_researches_total_xp_levels_spent%` |
+| 研究 | 研究头衔 | `%slimefun_researches_title%` |
+| 杂项 | GPS 网络复杂度 | `%slimefun_gps_complexity%` |
+| 杂项 | Slimefun 语言（仅在线） | `%slimefun_language%` |
+| 杂项 | 全服活动累计耗时（**全服**值） | `%slimefun_timings_lag%` |
+
+与 Paper's Delight 不同，这些占位符**不带玩家名参数**：玩家由 PlaceholderAPI 在解析时传入，
+所以模板里没有 `{player}`；解析的仍然是 `/pi pd` / 报告指定的那名玩家。
+
+其中三点容易踩坑，插件已按实际情况处理：
+
+- `%slimefun_researches_total_researches%` 与 `%slimefun_timings_lag%` 是**全服**值，与查询哪名玩家无关
+  （每名玩家的报告里都一样），标签里已写明“全服”，避免被读成个人数据。
+- 已解锁数量 / 百分比 / 解锁累计消耗等级 / 研究头衔来自 Slimefun 的**玩家档案**：档案尚未载入时
+  （对离线玩家很常见）Slimefun 返回的是一条“档案载入中”的提示文本而不是数字。这几项因此要求返回值
+  必须是数字，非数字会被当作未解析丢掉——宁可这一行不出现，也不把提示文本写进报告。
+- `%slimefun_language%` 只对在线玩家有效，所以标为仅在线。
+
+数据出现的位置：
 
 - `/pi pd [玩家]`：在游戏内直接打印（不带参数 = 自己）。
 - 玩家月报在结尾前追加 `## 附：插件数据（PlaceholderAPI，实时）` 章节，并生成机器可读的
@@ -306,6 +350,8 @@ integrations:
     export-json: true
     papersdelight:
       enabled: true
+    slimefun:
+      enabled: true
     custom:
       - group: "某插件"
         label: "当前余额"
@@ -314,9 +360,15 @@ integrations:
         label: "今日签到"
         placeholder: "%someplugin_streak_{player}%"
         online-only: true
+      - group: "某插件"
+        label: "累计矿石"
+        placeholder: "%someplugin_ores_{player}%"
+        numeric: true
 ```
 
-`{player}` 会替换成玩家名；PlaceholderAPI 原样退回的占位符（插件未安装或占位符不存在）会被静默跳过。
+`{player}` 会替换成玩家名（Slimefun 这类由 PlaceholderAPI 传入玩家的占位符直接写占位符本身即可）；
+`online-only: true` 表示只在玩家在线时解析；`numeric: true` 表示该指标必须是数字，插件返回提示文本
+之类的内容时按“未解析”丢弃；PlaceholderAPI 原样退回的占位符（插件未安装或占位符不存在）会被静默跳过。
 
 ## 十一、许可
 

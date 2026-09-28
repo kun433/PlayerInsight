@@ -16,10 +16,11 @@ import java.util.Map;
 /**
  * 插件联动层的离线校验（不需要服务器、不需要 PlaceholderAPI）。
  *
- * <p>覆盖四件事：
+ * <p>覆盖五件事：
  * <ol>
  *   <li>内置 Paper's Delight 档案的占位符名与官方文档逐条一致；</li>
- *   <li>解析规则：{player} 替换、在线限定、未解析（原样退回）/空值/null 丢弃；</li>
+ *   <li>内置 Slimefun 档案的占位符名与官方文档逐条一致（模板不带 {player}）；</li>
+ *   <li>解析规则：{player} 替换、在线限定、未解析（原样退回）/空值/null 丢弃、numeric 数值校验；</li>
  *   <li>PluginData 的 Markdown / JSON / 指令行渲染；</li>
  *   <li>报告章节只在其有数据时追加，且不启用联动时报告与旧版逐行一致。</li>
  * </ol>
@@ -37,7 +38,9 @@ public final class IntegrationTest {
 
     public static void main(String[] args) throws IOException {
         checkTemplates();
+        checkSlimefunTemplates();
         checkResolution();
+        checkSlimefunResolution();
         checkRendering();
         checkReportSection();
 
@@ -84,6 +87,109 @@ public final class IntegrationTest {
     }
 
     // ================= 2. 解析规则 =================
+
+    private static void checkSlimefunTemplates() {
+        List<PluginIntegrations.Entry> entries = PluginIntegrations.slimefunEntries();
+        assertEquals("Slimefun 档案条目数", 8, entries.size());
+
+        List<String> expanded = new ArrayList<String>();
+        for (PluginIntegrations.Entry e : entries) {
+            expanded.add(e.getTemplate().replace("{player}", "Steve"));
+        }
+        // 以下字符串逐条来自 Slimefun（粘液科技）PlaceholderAPI 文档
+        expect(expanded, "%slimefun_researches_total_researches%");
+        expect(expanded, "%slimefun_researches_total_researches_unlocked%");
+        expect(expanded, "%slimefun_researches_total_xp_levels_spent%");
+        expect(expanded, "%slimefun_researches_percentage_researches_unlocked%");
+        expect(expanded, "%slimefun_researches_title%");
+        expect(expanded, "%slimefun_gps_complexity%");
+        expect(expanded, "%slimefun_timings_lag%");
+        expect(expanded, "%slimefun_language%");
+
+        // Slimefun 的占位符由 PlaceholderAPI 在解析时传入玩家，模板本身不带 {player}
+        for (PluginIntegrations.Entry e : entries) {
+            assertTrue("Slimefun 模板不含 {player}: " + e.getTemplate(),
+                    !e.getTemplate().contains("{player}"));
+        }
+
+        int onlineOnly = 0;
+        int numeric = 0;
+        for (PluginIntegrations.Entry e : entries) {
+            if (e.isOnlineOnly()) {
+                onlineOnly++;
+            }
+            if (e.isNumeric()) {
+                numeric++;
+            }
+            // %slimefun_timings_lag% 返回的是 "1234ms" 这样的文本，不能标成数值类
+            if (e.getTemplate().contains("timings_lag")) {
+                assertTrue("timings_lag 不是数值类", !e.isNumeric());
+            }
+        }
+        assertEquals("Slimefun 仅在线条目数（只有语言）", 1, onlineOnly);
+        assertEquals("Slimefun 数值类条目数", 5, numeric);
+    }
+
+    private static void checkSlimefunResolution() {
+        PluginIntegrations integrations =
+                PluginIntegrations.of(true, true, true, PluginIntegrations.slimefunEntries());
+
+        final Map<String, String> values = new HashMap<String, String>();
+        values.put("%slimefun_researches_total_researches%", "42");
+        values.put("%slimefun_researches_total_researches_unlocked%", "7");
+        values.put("%slimefun_researches_percentage_researches_unlocked%", "16.67");
+        values.put("%slimefun_researches_total_xp_levels_spent%", "135");
+        values.put("%slimefun_researches_title%", "工程师");
+        values.put("%slimefun_gps_complexity%", "128");
+        values.put("%slimefun_timings_lag%", "1234.5ms");
+        values.put("%slimefun_language%", "简体中文 (China)");
+
+        PluginIntegrations.Resolver resolver = new PluginIntegrations.Resolver() {
+            @Override
+            public String resolve(String placeholder) {
+                String v = values.get(placeholder);
+                return v == null ? placeholder : v;
+            }
+        };
+
+        PluginData online = integrations.resolveWith("Steve", true, resolver);
+        assertEquals("在线玩家的 Slimefun 条目数", 8, online.size());
+        assertEquals("Slimefun 分组数", 2, online.groupCount());
+        assertTrue("含全服活动累计耗时（带 ms 的文本）", online.markdown().contains("1234.5ms"));
+        assertTrue("含研究头衔", online.markdown().contains("工程师"));
+        assertTrue("含已解锁百分比", online.markdown().contains("16.67"));
+
+        PluginData offline = integrations.resolveWith("Steve", false, resolver);
+        assertEquals("离线玩家少掉仅在线的语言", 7, offline.size());
+        assertTrue("离线仍含 GPS 复杂度", offline.markdown().contains("128"));
+
+        // 玩家档案尚未载入时，Slimefun 对研究类占位符返回提示文本而不是数字：
+        // 标了 numeric 的条目应被丢弃，只有文本类条目保留下来
+        final Map<String, String> loading = new HashMap<String, String>();
+        for (PluginIntegrations.Entry e : PluginIntegrations.slimefunEntries()) {
+            loading.put(e.getTemplate(), "档案载入中，请稍候…");
+        }
+        PluginIntegrations.Resolver loadingResolver = new PluginIntegrations.Resolver() {
+            @Override
+            public String resolve(String placeholder) {
+                String v = loading.get(placeholder);
+                return v == null ? placeholder : v;
+            }
+        };
+        PluginData pending = integrations.resolveWith("Steve", true, loadingResolver);
+        assertEquals("档案载入中时只剩未标 numeric 的 3 个文本条目", 3, pending.size());
+        assertTrue("研究头衔是文本类，保留", pending.markdown().contains("档案载入中"));
+        assertTrue("已解锁数量是数值类，丢弃", !pending.markdown().contains("已解锁研究数量"));
+
+        // 纯函数级别的数值判定
+        assertTrue("整数是数字", PluginIntegrations.isNumericValue("42"));
+        assertTrue("小数是数字", PluginIntegrations.isNumericValue(" 16.67 "));
+        assertTrue("负数是数字", PluginIntegrations.isNumericValue("-3"));
+        assertTrue("带 ms 的文本不是数字", !PluginIntegrations.isNumericValue("1234.5ms"));
+        assertTrue("档案载入提示不是数字", !PluginIntegrations.isNumericValue("档案载入中，请稍候…"));
+        assertTrue("空串不是数字", !PluginIntegrations.isNumericValue("   "));
+        assertTrue("null 不是数字", !PluginIntegrations.isNumericValue(null));
+    }
 
     private static void checkResolution() {
         PluginIntegrations integrations =
