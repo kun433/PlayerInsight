@@ -122,9 +122,9 @@ plugins/PlayerInsight/
 └── records/<player>/<player>-<from>_to_<to>.md    # per-N-day player records (day-by-day + detail)
 ```
 
-Only Markdown is produced. A day/month in which no player left any record produces **no file at all**
-(v2.1.x and earlier wrote a “0 active players” report for every such day).
-On startup the plugin also deletes those legacy empty aggregate reports; run `/pi cleanup` to repeat it.
+Only Markdown is produced. A day/month in which no player left any record produces **no file at all**.
+On startup the plugin also deletes legacy empty aggregate reports (reports that only say “0 active players”);
+run `/pi cleanup` to repeat it.
 
 Monthly report sections: key metrics → session timeline → movement and activity range →
 **mining detail (by material + ores + Y-level distribution + tools + coordinates/state/light of every break + first/last time each ore was obtained)**
@@ -221,123 +221,17 @@ against a real server).
 3. New full item and production chain (craft/smelt/enchant/anvil/brew/fishing output/shear/breed/tame/bucket/tool wear).
 4. New container access, mob kills, damage sources, teleport/portal, sleep, level-up, ignite, sign and advancement events.
 5. Death records carry the drop list, experience lost, level and equipment.
-6. Reports grew from 11 coarse sections to 19 detailed ones, plus JSON (for AI/scripts) and CSV (for Excel).
+6. Reports grew from 11 coarse sections to 19 detailed ones.
 7. Online time is now computed precisely by pairing JOIN/LEAVE (the old version counted a month's accumulation as a day's time).
 8. Chinese chat gained two-character bigram tokenisation; the frequent-word tables only make sense on Chinese servers.
 9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
 10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
 
-### v2.1.2 update (2026-09-28): adapted to Slimefun
-
-- The integration layer gained a built-in **Slimefun** profile: all 8 `%slimefun_*%` placeholders from
-  the [Slimefun wiki PlaceholderAPI page](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/) are wired in
-  (total researches / unlocked researches / unlocked percentage / XP levels spent / research title,
-  GPS network complexity, Slimefun language, accumulated activity time).
-- New config switch `integrations.placeholderapi.slimefun.enabled` (on by default).
-- New per-entry **`numeric` validation**: numeric metrics must return a parseable number. While a
-  player's Slimefun profile is not loaded yet (common for offline players) Slimefun returns a
-  "profile loading" notice instead of a number; such a value is treated as unresolved and dropped
-  rather than written into the report. Custom entries can opt in with `numeric: true`.
-- Only the 1.21.11 build changes; the 1.12.2 build has no functional change and only follows the
-  release number to `2.1.2-1.12.2`.
-- `tests/IntegrationTest.java` gained assertions for the Slimefun placeholder names, `{player}`-free
-  templates, the online-only flag and `numeric` filtering (85 assertions in the file, all passing).
-- Fixed a latent hazard in `tests/build-both.ps1`: it used to copy the 1.12.2 `config.yml` and main
-  class over the 1.21.11 ones, so a single run would wipe the whole 1.21.11 integration layer (true
-  since v2.1.1). It now synchronises only the genuinely shared files and adds an integrity guard that
-  fails loudly if the integration layer is missing instead of silently packaging a stripped jar.
-
-### v2.1.1 update (2026-09-27): adapted to some plugins
-
-- New **plugin integration layer** built on a soft PlaceholderAPI dependency: other plugins' data can
-  now be shown in PlayerInsight commands and reports (see section 10). Without PlaceholderAPI nothing
-  changes and reports stay identical to v2.1.0.
-- Built-in profile for **Paper's Delight** (the plugin version of *Farmer's Delight*): cooking pot /
-  skillet / cutting board totals (offline-friendly) and the Nourishment / Comfort / Garlic effect state,
-  remaining time and total applications (online only).
-- New command `/pi pd [player]`; monthly reports gain a `附：插件数据（PlaceholderAPI，实时）` section
-  (as of v2.2.0 no `-integrations.json` sidecar is written any more).
-- Fixed the 1.21.11 `plugin.yml` **`api-version`**, which held the plugin version string instead of a
-  Minecraft API version (`2.1.0-1.21.11` → `1.21`).
-- Only the 1.21.11 build changes; the 1.12.2 build stays at 2.1.0.
-- New offline test `tests/IntegrationTest.java` (placeholder names, resolution rules, rendering and
-  report-section placement, 40 assertions).
-
-### v2.1.0 update
-
-- Version numbers unified as `2.1.0-1.12.2` / `2.1.0-1.21.11`
-- Artifact names unified as `PlayerInsight-2.1.0-*.jar`
-- Functionally identical to `-5`; only the version number changed
-
-### `-3` refinements (2026-09-21)
-
-- The "block leaderboard (all players merged)" in daily/monthly reports was upgraded: it now shows the
-  server-wide total and material count, and the table carries the **rank, number of contributing players
-  and top 3 contributors with their shares**; when more than 25 materials exist it points to the per-player detail.
-- A **top 3 mined materials** line was added per player under the player table, making it easy to compare who mines what at a glance.
-- Both builds still share one codebase (only `Compat` and the chat event differ) and produce line-identical reports.
-
-### `-4` major upgrade (2026-09-21): both versions at once
-
-> The two versions have always shared one codebase (only `Compat` and the chat event differ), so this
-> upgrade landed on both 1.12.2 and 1.21.11, and both produce line-identical reports (verified by
-> comparing against the same event data).
-
-Recording layer:
-
-1. **Block drops**: every break also records a `drops` line (e.g. `DIAMOND x1`), so reports can show what mining actually yields.
-2. **Combat summary `COMBAT`**: hits/damage/weapon/targets are written as one event every 60 seconds (PvP is still recorded per exchange),
-   showing combat intensity without hundreds of log lines per fight.
-3. **Projectiles `SHOOT`**: launches of arrows / tridents / ender pearls / snowballs / potions.
-4. **Villager trades `TRADE`**: items and counts obtained, plus the merchant's title.
-5. **Fishing results**: CAUGHT_FISH / CAUGHT_ENTITY / FAILED_ATTEMPT / IN_GROUND, so success rates can be computed.
-6. **Quit snapshot `SNAPSHOT`**: level/experience/health/food/position/held item/equipment + inventory statistics.
-7. **First/last acquisition time per ore**.
-8. **Activity heat**: hourly event and block-break counts, plus arrivals per chunk.
-
-Report layer (4 new monthly sections, 19 in total):
-
-- 15. Active hours and activity areas (24-hour histogram + Top 15 activity chunks)
-- 16. Output, combat and interaction detail (total drops, combat stats, weapons, projectiles, trades, fishing)
-- 17. State at the most recent logout (including inventory Top 20)
-- 18. Day-by-day detail (online/session/movement/mining/ores/placing/containers/deaths/kills/chat/commands for each day)
-
-Command layer: new `/pi top [month|day]` (server leaderboards), `/pi last <player> [count]` (recent events)
-and `/pi where <player>` (last position, current position when online); `/pi gen monthly` now produces a
-monthly report with the day-by-day table.
-
-Configuration layer: five new switches — `record.trading` / `record.projectiles` / `record.snapshots`,
-`combat-summary.interval-seconds`, `report.per-day-detail`.
-
-### `-5` major upgrade modelled on PlayerMoveLog (2026-09-21)
-
-Taking the idea from [PlayerMoveLog](https://github.com/KUBOAKI01/movelog), periodic heartbeats and a
-human-readable trail log were folded into PlayerInsight:
-
-1. **Trail text log** (default `plugins/PlayerInsight/trail/`; can be pointed at a `movelog` directory in the server root):
-
-   ```text
-   2026-09-21 20:30:05 | Steve | world:120.50:64.00:-45.20 | minecraft:diamond_sword | 心跳
-   ```
-
-   The format is `time | player | world:X:Y:Z | held item | note` (the note is optional), coordinates with two
-   decimals, UTF-8; one file per 4 hours by default (`2026-09-21-20.log`), optional Excel-compatible BOM, expired files cleaned up automatically.
-2. **Periodic heartbeat**: by default every 60 seconds it records every online player (including idle ones), and optionally writes an extra `TRAIL` line to the JSONL every 5 minutes for report statistics.
-3. **Event-driven additions**: a trail line is written immediately on join / quit / death / world change.
-4. **TPS protection**: when TPS is below the threshold (18 by default) the round is skipped, so the plugin never hammers the disk on a lagging server.
-5. **Filtering and exemptions**: bots (`getAddress()==null`) are skipped automatically; world blacklist, player blacklist and permission exemption are configurable.
-6. **Zero blocking**: the main thread only collects data (never touches the disk); all writes happen on async threads with atomic re-entrancy protection and failure back-off.
-7. **New commands**: `/pi trace <player> [page]` for the trail, `/pi status` for runtime state.
-8. **Report additions**: monthly section 15 gained "15.3 Position heartbeats" (heartbeat count, worlds, commonly held items,
-   last heartbeat position and held item); the JSON summary gained `heartbeats` / `heartbeatsByHour` / `heldItems` / `lastHeartbeat`.
-9. **Tests**: new `tests/TrailLogTest.java` (line format, bucketing, BOM and cleanup — 24 assertions, run against both builds' output).
-
 ## 10. Plugin integrations (PlaceholderAPI)
 
 PlayerInsight can show data owned by *other* plugins by reading their
-[PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) placeholders — that is what
-"adapted to some plugins" has meant since v2.1.1. It is a **soft dependency**: with no PlaceholderAPI
-installed the whole integration layer stays off and the reports are byte-identical to v2.1.0.
+[PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) placeholders. It is a **soft dependency**:
+with no PlaceholderAPI installed the whole integration layer stays off and the reports are unaffected.
 
 Built-in profile — **Paper's Delight** (the plugin version of *Farmer's Delight*):
 
@@ -383,7 +277,7 @@ Where the data shows up:
 
 - `/pi pd [player]` prints the resolved values in game (no argument = yourself).
 - Monthly player reports get an extra section `## 附：插件数据（PlaceholderAPI，实时）` right before the
-  closing footer. It is omitted entirely when nothing resolves (v2.2.0 removed the `…-integrations.json` sidecar).
+  closing footer. It is omitted entirely when nothing resolves (no `…-integrations.json` sidecar is written).
 
 These numbers are the plugin's own **lifetime counters**, so they are *not* a replay of the monthly
 JSONL and do not change when you run `/pi gen`. They are only resolved for players the server still has
