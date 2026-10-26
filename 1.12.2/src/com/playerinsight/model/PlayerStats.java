@@ -94,6 +94,8 @@ public class PlayerStats {
     // ---------- 方块 ----------
     private long blockBreak = 0L;
     private long blockPlace = 0L;
+    /** 其中由连锁挖掘（Veinminer 等插件派发的子类事件）记录的方块数。 */
+    private long veinBreaks = 0L;
     private final Map<String, Integer> minedByMaterial = new LinkedHashMap<String, Integer>();
     private final Map<String, Integer> placedByMaterial = new LinkedHashMap<String, Integer>();
     private final Map<String, Integer> breakToolFreq = new LinkedHashMap<String, Integer>();
@@ -525,6 +527,9 @@ public class PlayerStats {
         }
         if ("BREAK".equals(action)) {
             this.blockBreak++;
+            if (Text.bool(e, "vein")) {
+                this.veinBreaks++;
+            }
             merge(this.minedByMaterial, material);
             merge(this.breakWorld, Text.strOr(e, "world", "?"));
             String tool = Text.str(e, "tool");
@@ -1212,6 +1217,10 @@ public class PlayerStats {
 
     public synchronized long getBlockBreak() {
         return this.blockBreak;
+    }
+
+    public synchronized long getVeinBreaks() {
+        return this.veinBreaks;
     }
 
     public synchronized long getBlockPlace() {

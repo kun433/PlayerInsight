@@ -134,7 +134,12 @@ public final class ReportGenerator {
 
     private static void mining(StringBuilder b, PlayerStats s) {
         b.append("## 四、挖掘明细（挖了什么方块）\n\n");
-        b.append("共挖掘 **").append(s.getBlockBreak()).append("** 个方块。\n\n");
+        b.append("共挖掘 **").append(s.getBlockBreak()).append("** 个方块。");
+        if (s.getVeinBreaks() > 0L) {
+            b.append("其中经连锁挖掘（Veinminer 等）逐块记录 **").append(s.getVeinBreaks()).append("** 个（")
+                    .append(Text.pct(s.getVeinBreaks(), s.getBlockBreak())).append("）。");
+        }
+        b.append("\n\n");
         if (s.getBlockBreak() == 0L) {
             b.append("_本月没有挖掘记录。_\n\n");
             return;

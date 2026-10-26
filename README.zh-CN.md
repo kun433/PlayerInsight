@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.2 — 详细玩家行为记录插件
+# PlayerInsight v2.2.0 — 详细玩家行为记录插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -8,12 +8,15 @@
 
 | 构建 | 目标平台 | 字节码 | 产物 |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.2-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.2-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
 
-v2.1.2 只动 1.21.11 构建：插件联动层新增 **Slimefun（《粘液科技》）** 内置档案（见第十节）。
-1.12.2 构建本次**没有功能改动**，只把版本号跟随发布号升到 `2.1.2`，让两个产物不再长期停在不同的版本号上；
-它的功能与 2.1.0 逐字一致（1.12.2 上本来就没有插件联动层）。
+v2.2.0 两个构建同步改动：
+
+1. **没有玩家就不生成报告。** 某天/某月没有任何玩家记录时，不再写出空报告（以前每天都写一份“活跃玩家 0”）。
+2. **只生成 Markdown。** 日报/月报不再输出 json、csv 与 `-integrations.json` 边车文件。
+3. **清理历史空报告。** 启动时扫描 `reports/`，删掉内容为“活跃玩家 0”的聚合报告；`/pi cleanup` 可手动重跑。
+4. **适配 Veinminer（连锁挖矿）。** 连锁破坏的每个方块都会被逐块记录，即使某个插件在派发事件前已把方块置空，也能保住真实材质（见第 3.1 节）。
 
 两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
 只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
@@ -33,7 +36,7 @@ v2.1.2 只动 1.21.11 构建：插件联动层新增 **Slimefun（《粘液科�
 
 | 指令 | 作用 |
 | --- | --- |
-| `/pi report <玩家>` | 生成本月报告（md + json + csv） |
+| `/pi report <玩家>` | 生成本月报告（Markdown） |
 | `/pi month <玩家> <yyyy-MM>` | 生成指定月份报告 |
 | `/pi day <玩家> [yyyy-MM-dd]` | 生成某一天的玩家明细报告 |
 | `/pi blocks <玩家> [today\|month\|yyyy-MM]` | 直接在游戏里看“挖了什么方块”榜单 |
@@ -45,6 +48,7 @@ v2.1.2 只动 1.21.11 构建：插件联动层新增 **Slimefun（《粘液科�
 | `/pi stats [玩家]` | 已记录玩家列表 / 单个玩家本月摘要 |
 | `/pi pd [玩家]` | 查看插件数据（经 PlaceholderAPI，如 Paper's Delight 的烹饪统计与效果、Slimefun 的研究进度） |
 | `/pi gen <daily\|monthly\|records> [日期]` | 手动重跑自动报告 |
+| `/pi cleanup` | 删除历史上“没有任何玩家记录”的空报告 |
 | `/pi reload` | 重载配置 |
 
 别名 `/playerinsight`；权限节点 `playerinsight.use`（默认 OP）。
@@ -78,6 +82,26 @@ v2.1.2 只动 1.21.11 构建：插件联动层新增 **Slimefun（《粘液科�
 
 另有 `players.yml` 玩家索引（uuid ↔ 名称、首次/最后出现时间，历史日志也会自动补全）。
 
+### 3.1 连锁挖矿插件（Veinminer）
+
+[Veinminer](https://github.com/MiraculixxT/Veinminer)（2.x，Paper/Folia 插件）一次挖掉整条矿脉。它会逐块破坏，
+并在 Paper 构建上为每个方块派发一个 `VeinminerEvent extends BlockBreakEvent`，
+时机是**方块被置空之前**，所以 PlayerInsight 会把整条矿脉的每个方块都当作普通破坏记录下来（含真实材质、工具、坐标与掉落物）。
+
+为了在“插件先把方块置空、再派发事件”的极端情况下也不丢数据，PlayerInsight 在最前面（`LOWEST`）把方块材质存成快照，
+到了 `MONITOR` 阶段如果读到 `AIR` 就用快照里的真实材质。以 `BlockBreakEvent` 子类形式到来的破坏会在原始日志里标记出来：
+
+```json
+{"type":"BLOCK","action":"BREAK","material":"DIAMOND_ORE","ore":true,"via":"VeinminerEvent","vein":true}
+```
+
+这些方块照常计入挖掘总数（`vein` 只是一个额外属性）：月报「四、挖掘明细」会多一行“其中经连锁挖掘”、
+日报总览表会多一行“其中连锁挖掘”。`/pi status` 会显示是否检测到 Veinminer、本次运行已经逐块记录了多少个方块，
+是最快的联调确认方式。
+
+注意：只有**会派发 Bukkit 事件**的发行形式能被这样捕获（2.x 插件版）。1.x 的 datapack 版本用原版函数破坏方块，
+不会产生任何事件，因此任何基于监听的插件（包括 PlayerInsight）都无法把这部分挖掘归属到玩家。
+
 ## 四、生成了什么报告
 
 ```
@@ -87,17 +111,15 @@ plugins/PlayerInsight/
 ├── state.properties                 # 自动报告进度
 ├── reports/
 │   ├── daily/<日期>-all-players.md   # 全服日报（含总表、方块榜、每人明细）
-│   ├── daily/<日期>-all-players.json # 机器可读日报
-│   ├── daily/<日期>-all-players.csv  # 表格日报（一行一人）
 │   ├── monthly/<玩家>-<月>-report.md        # 玩家月报（19 个章节）
-│   ├── monthly/<玩家>-<月>-summary.json     # 机器可读月报汇总
-│   ├── monthly/<玩家>-<月>-blocks.csv       # 方块统计（挖掘/放置/矿物）
-│   ├── monthly/<玩家>-<月>-integrations.json # 插件数据（PlaceholderAPI，能解析时才生成）
 │   └── monthly/<月>-all-players.md          # 全服月度汇总
 ├── trail/                                   # 轨迹文本日志（人类可读，按时段滚动）
 │   └── 2026-09-21-20.log                    # 时间 | 玩家 | 世界:X:Y:Z | 手持物品 | 备注
 └── records/<玩家>/<玩家>-<起>_to_<止>.md    # 每 N 天的玩家记录（逐日 + 明细）
 ```
+
+只输出 Markdown。某天/某月没有任何玩家记录时**一个文件都不生成**（v2.1.x 及以前会为这种日子写一份“活跃玩家 0”的空报告）。
+插件启动时也会自动清理这些历史遗留的空聚合报告；`/pi cleanup` 可随时手动重跑。
 
 月报章节：关键指标 → 会话时间线 → 移动与活动范围 → **挖掘明细（按材质 + 矿物 + Y 层分布 + 工具 + 每次破坏的坐标/状态/亮度 + 每种矿物的首/末次获得时间）**
 → 放置明细 → 物品与生产 → 容器访问 → 战斗（死亡含掉落物/装备） → 进度与生活行为 → 聊天与指令
@@ -120,7 +142,7 @@ plugins/PlayerInsight/
 - `combat-summary.interval-seconds`：战斗汇总的间隔（默认 60 秒）。
 - `report.per-day-detail`：月报里是否生成“逐日明细”表（默认开）。
 - `move-log.interval-seconds` / `only-when-moved`：移动采样间隔与是否只在移动时记录（默认 5 秒、只在移动时记）。
-- `export.json` / `export.csv`：是否额外导出机器可读格式。
+- `cleanup-empty-reports`：启动时是否清理历史上没有玩家记录的空聚合报告（默认开）。
 - `integrations.placeholderapi.*`：经 PlaceholderAPI 的插件联动（见第十节）。
 - `player-record.interval-days`：每 N 天生成一份玩家记录。
 
@@ -195,6 +217,22 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 9. 新增 `players.yml` 玩家索引与历史日志补全，离线玩家可查、可读。
 10. 兼容 v1 的旧日志（包括旧版把拾取/丢弃/食用写成 `BLOCK` 事件的情况）。
 
+### v2.2.0 更新：无玩家不生成、只出 md、适配 Veinminer
+
+- **没有玩家就不生成报告**：`generateDailyReport` / `generateMonthlyReportsFor` 在聚合结果为空时直接返回，
+  某天/某月没有任何玩家记录就不写任何文件；日志会打印 `跳过日报生成` / `跳过月报生成`。
+- **只生成 Markdown**：写入路径里删掉了 JSON / CSV 导出与 `-integrations.json` 边车文件，`export.*` 配置项一并移除；
+  `DataExport` 类保留（离线回放测试 `ReplayHarness` 还在用）。
+- **清理历史空报告**：新增 `cleanupEmptyReports()`，扫描 `reports/daily/*-all-players.*` 与 `reports/monthly/*-all-players.*`，
+  正文含 `| 活跃玩家 | 0 |` 的视为空报告，连它的 `.md` / `.json` / `.csv` 一起删掉；启动 10 秒后自动跑一次
+  （配置 `cleanup-empty-reports`），也可用 `/pi cleanup` 手动重跑。有数据的报告一律不动。
+- **适配 Veinminer（连锁挖矿）**：`LOWEST` 优先级的 `BlockBreakEvent` 监听器先把方块真实材质存成快照，
+  `MONITOR` 阶段发现方块已是 `AIR` 时用快照补齐，避免连锁挖掘插件先置空再派发事件时丢材质；
+  以 `BlockBreakEvent` 子类形式到来的破坏（Veinminer 自己的 `VeinminerEvent`，或其它连锁挖掘插件）
+  会在原始日志里标记 `via` + `vein: true` 并正常计入挖掘，不会被丢弃。
+  `/pi status` 显示是否检测到 Veinminer 与本次已记录的连锁方块数；月报「挖掘明细」与日报总览会在数量不为 0 时多一行“连锁挖掘”。
+- 新增离线测试 `tests/CleanupTest.java`（空报告识别与删除集合共 9 条断言）。
+
 ### v2.1.2 更新（2026-09-28）：适配 Slimefun（粘液科技）
 
 - 插件联动层新增内置档案 **Slimefun**：按 [粘液科技中文 Wiki 的 PlaceholderAPI 页面](https://slimefun-wiki.guizhanss.cn/PlaceholderAPI/)
@@ -217,8 +255,8 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
   （见第十节）。没装 PlaceholderAPI 时一切不变，报告与 v2.1.0 逐字一致。
 - 内置 **Paper's Delight**（《农夫乐事》插件版）档案：厨锅 / 煎锅 / 砧板累计次数（支持离线玩家），
   以及滋养 / 舒适 / 大蒜三种效果的当前状态、剩余时间与累计施加次数（仅在线玩家）。
-- 新增指令 `/pi pd [玩家]`；月报新增「附：插件数据（PlaceholderAPI，实时）」章节与
-  `…-integrations.json` 边车文件，解析不到数据时整节不输出。
+- 新增指令 `/pi pd [玩家]`；月报新增「附：插件数据（PlaceholderAPI，实时）」章节
+  （v2.2.0 起不再输出 `…-integrations.json` 边车文件），解析不到数据时整节不输出。
 - 修正 1.21.11 的 `plugin.yml` **`api-version`**：原来误填成插件版本号（`2.1.0-1.21.11`），
   现改为合法值 `1.21`。
 - 只改 1.21.11 构建；1.12.2 构建仍为 2.1.0。
@@ -334,8 +372,8 @@ PlayerInsight 可以读取**其他插件**的数据：通过 [PlaceholderAPI](ht
 数据出现的位置：
 
 - `/pi pd [玩家]`：在游戏内直接打印（不带参数 = 自己）。
-- 玩家月报在结尾前追加 `## 附：插件数据（PlaceholderAPI，实时）` 章节，并生成机器可读的
-  `…-integrations.json` 边车文件；解析不到任何数据时两者都不输出。
+- 玩家月报在结尾前追加 `## 附：插件数据（PlaceholderAPI，实时）` 章节；解析不到任何数据时整节不输出
+  （v2.2.0 起不再生成 `…-integrations.json` 边车文件）。
 
 这些数值是插件自身的**累计统计**，不是当月 JSONL 的回放，因此 `/pi gen` 不会改变它们；
 只对服务器仍有缓存的玩家解析，且不会发起阻塞式联网查询。
@@ -347,7 +385,6 @@ integrations:
   placeholderapi:
     enabled: true
     report-section: true
-    export-json: true
     papersdelight:
       enabled: true
     slimefun:

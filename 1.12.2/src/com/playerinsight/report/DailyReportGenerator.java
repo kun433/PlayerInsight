@@ -31,12 +31,14 @@ public final class DailyReportGenerator {
         long totalBreak = 0L;
         long totalPlace = 0L;
         long totalOre = 0L;
+        long totalVein = 0L;
         long totalDeaths = 0L;
         long totalChat = 0L;
         long totalCmd = 0L;
         for (PlayerStats s : players.values()) {
             totalOnline += Math.round(s.getOnlineSeconds());
             totalBreak += s.getBlockBreak();
+            totalVein += s.getVeinBreaks();
             totalPlace += s.getBlockPlace();
             totalOre += s.getOresMined();
             totalDeaths += s.getDeaths();
@@ -49,6 +51,10 @@ public final class DailyReportGenerator {
         b.append("| 活跃玩家 | ").append(players.size()).append(" |\n");
         b.append("| 在线时长合计 | ").append(Text.duration(totalOnline)).append(" |\n");
         b.append("| 挖掘方块合计 | ").append(totalBreak).append("（矿物 ").append(totalOre).append("） |\n");
+        if (totalVein > 0L) {
+            b.append("| 其中连锁挖掘（Veinminer 等） | ").append(totalVein)
+                    .append("（").append(Text.pct(totalVein, totalBreak)).append("） |\n");
+        }
         b.append("| 放置方块合计 | ").append(totalPlace).append(" |\n");
         b.append("| 死亡合计 | ").append(totalDeaths).append(" |\n");
         b.append("| 聊天 / 指令合计 | ").append(totalChat).append(" / ").append(totalCmd).append(" |\n\n");

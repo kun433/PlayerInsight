@@ -1,4 +1,4 @@
-# PlayerInsight v2.1.2 — Detailed Player Activity Logging Plugin
+# PlayerInsight v2.2.0 — Detailed Player Activity Logging Plugin
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -9,13 +9,19 @@ The same feature set is built as two separate artifacts:
 
 | Build | Target platform | Bytecode | Artifact |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.1.2-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.1.2-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
 
-v2.1.2 only touches the 1.21.11 build: the plugin integration layer gains a built-in **Slimefun** profile
-(see section 10). The 1.12.2 build has **no functional change** in this release; it only follows the
-release number to `2.1.2`, so the two artifacts no longer sit two versions apart. Its behaviour is
-identical to 2.1.0 (it carries no integration layer at all).
+v2.2.0 changes both builds:
+
+1. **No players, no report.** A day or month with nothing recorded for any player no longer produces
+   an empty report file at all (previously it wrote a “0 active players” report every day).
+2. **Markdown only.** The plugin now writes only `.md` files: the JSON/CSV daily and monthly exports and
+   the `-integrations.json` sidecar are gone.
+3. **Historical empty reports are cleaned up.** On startup the plugin scans `reports/` and deletes the
+   aggregate reports whose content shows “0 active players”; `/pi cleanup` reruns it manually.
+4. **Veinminer compatibility.** Vein chain-breaking is recorded block by block, and a block that another
+   plugin destroyed before the event is still attributed to its real material (see section 3.1).
 
 Both builds share identical events, data structures and report formats (the same `PlayerStats` /
 `ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
@@ -37,7 +43,7 @@ reading old files and includes the old format in its reports.
 
 | Command | Effect |
 | --- | --- |
-| `/pi report <player>` | Generate this month's report (md + json + csv) |
+| `/pi report <player>` | Generate this month's report (Markdown) |
 | `/pi month <player> <yyyy-MM>` | Generate a report for a specific month |
 | `/pi day <player> [yyyy-MM-dd]` | Generate a per-day detail report for a player |
 | `/pi blocks <player> [today\|month\|yyyy-MM]` | View a "blocks mined" leaderboard directly in game |
@@ -49,6 +55,7 @@ reading old files and includes the old format in its reports.
 | `/pi stats [player]` | List of tracked players / this month's summary for one player |
 | `/pi pd [player]` | Plugin data pulled through PlaceholderAPI (Paper's Delight cooking stats and effects, Slimefun research progress) |
 | `/pi gen <daily\|monthly\|records> [date]` | Manually re-run an automatic report |
+| `/pi cleanup` | Delete historical aggregate reports that have no player records |
 | `/pi reload` | Reload the configuration |
 
 Alias `/playerinsight`; permission node `playerinsight.use` (OP by default).
@@ -83,6 +90,30 @@ will always match the logs**.
 
 There is also a `players.yml` player index (uuid ↔ name, first/last seen; historical logs are backfilled automatically).
 
+### 3.1 Chain-mining plugins (Veinminer)
+
+[Veinminer](https://github.com/MiraculixxT/Veinminer) (2.x, Paper/Folia plugin) mines a whole vein from one
+block. It breaks the vein block by block and, on the Paper build, fires a `VeinminerEvent extends
+BlockBreakEvent` for every block **before** the block is set to air — so PlayerInsight records each vein
+block as a normal break, with its real material, tool, coordinates and drops.
+
+To stay correct even when a plugin clears the block before dispatching the event, PlayerInsight keeps a
+`LOWEST`-priority snapshot of the block's material and falls back to it if the `MONITOR` handler already
+sees `AIR`. Events that arrive as a `BlockBreakEvent` subclass are tagged in the raw log:
+
+```json
+{"type":"BLOCK","action":"BREAK","material":"DIAMOND_ORE","ore":true,"via":"VeinminerEvent","vein":true}
+```
+
+Those breaks are counted as ordinary mined blocks (`vein` is only an extra attribute), the monthly report
+adds a “chain-mined” line under section 4, and the daily overview adds a “chain-mined” row. `/pi status`
+reports whether Veinminer is installed and how many vein blocks the current session has recorded — the
+quickest way to confirm the integration actually works on your server.
+
+Note: only distribution that **fires Bukkit events** can be seen this way (the 2.x plugin). The 1.x
+datapack variant breaks blocks through vanilla functions and fires no events, so no listener-based
+plugin — PlayerInsight included — can attribute that mining to a player.
+
 ## 4. What reports are produced
 
 ```
@@ -92,17 +123,16 @@ plugins/PlayerInsight/
 ├── state.properties                 # automatic report progress
 ├── reports/
 │   ├── daily/<date>-all-players.md   # server daily report (summary table, block leaderboard, per-player detail)
-│   ├── daily/<date>-all-players.json # machine-readable daily report
-│   ├── daily/<date>-all-players.csv  # tabular daily report (one row per player)
-│   ├── monthly/<player>-<month>-report.md        # player monthly report (19 sections)
-│   ├── monthly/<player>-<month>-summary.json     # machine-readable monthly summary
-│   ├── monthly/<player>-<month>-blocks.csv       # block statistics (broken/placed/ores)
-│   ├── monthly/<player>-<month>-integrations.json # plugin data via PlaceholderAPI (only when it resolves)
-│   └── monthly/<month>-all-players.md            # server-wide monthly summary
+│   ├── monthly/<player>-<month>-report.md  # player monthly report (19 sections)
+│   └── monthly/<month>-all-players.md      # server-wide monthly summary
 ├── trail/                                   # trail text log (human-readable, rolled by period)
 │   └── 2026-09-21-20.log                    # time | player | world:X:Y:Z | held item | note
 └── records/<player>/<player>-<from>_to_<to>.md    # per-N-day player records (day-by-day + detail)
 ```
+
+Only Markdown is produced. A day/month in which no player left any record produces **no file at all**
+(v2.1.x and earlier wrote a “0 active players” report for every such day).
+On startup the plugin also deletes those legacy empty aggregate reports; run `/pi cleanup` to repeat it.
 
 Monthly report sections: key metrics → session timeline → movement and activity range →
 **mining detail (by material + ores + Y-level distribution + tools + coordinates/state/light of every break + first/last time each ore was obtained)**
@@ -126,7 +156,7 @@ Every entry in `config.yml` is commented. Common switches:
 - `combat-summary.interval-seconds`: combat summary interval (60 s by default).
 - `report.per-day-detail`: whether the monthly report includes the day-by-day table (on by default).
 - `move-log.interval-seconds` / `only-when-moved`: movement sampling interval and whether to record only while moving (5 s and moving-only by default).
-- `export.json` / `export.csv`: whether to also export machine-readable formats.
+- `cleanup-empty-reports`: on startup, delete legacy aggregate reports that contain no player records (on by default).
 - `integrations.placeholderapi.*`: plugin integrations through PlaceholderAPI (see section 10).
 - `player-record.interval-days`: generate a player record every N days.
 
@@ -205,6 +235,27 @@ against a real server).
 9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
 10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
 
+### v2.2.0 update: no player no report, Markdown only, Veinminer support
+
+- **No players, no report.** `generateDailyReport` / `generateMonthlyReportsFor` now return early when the
+  aggregation is empty, so a day or month without any player record writes nothing. The log line says
+  `跳过日报生成` / `跳过月报生成` instead.
+- **Markdown only.** The JSON/CSV exports and the `-integrations.json` sidecar were removed from the write
+  path; the `export.*` config section is gone. `DataExport` is kept because the offline replay harness still uses it.
+- **Legacy empty reports are cleaned up.** New `cleanupEmptyReports()` scans `reports/daily/*-all-players.*`
+  and `reports/monthly/*-all-players.*`; a report whose body contains `| 活跃玩家 | 0 |` is treated as empty and
+  its `.md` / `.json` / `.csv` trio is deleted. It runs 10 s after startup (config `cleanup-empty-reports`)
+  and can be re-run with `/pi cleanup`. Reports that contain data are never touched.
+- **Veinminer compatibility.** A `LOWEST`-priority `BlockBreakEvent` listener snapshots the real material of
+  each broken block; the `MONITOR` handler falls back to that snapshot when the block already reads as `AIR`,
+  so chain-mining plugins that clear the block before firing the event can no longer lose the material.
+  Breaks delivered through a `BlockBreakEvent` subclass (Veinminer's own `VeinminerEvent`, or any other
+  chain-mining plugin) are tagged `via` + `vein: true` in the raw log instead of being dropped, and are
+  counted as ordinary mined blocks. `/pi status` shows whether Veinminer is installed and how many vein
+  blocks this session has recorded; monthly reports and the daily overview add a “chain-mined” line when
+  the count is non-zero.
+- New offline test `tests/CleanupTest.java` (9 assertions on empty-report detection and the delete set).
+
 ### v2.1.2 update (2026-09-28): adapted to Slimefun
 
 - The integration layer gained a built-in **Slimefun** profile: all 8 `%slimefun_*%` placeholders from
@@ -234,7 +285,7 @@ against a real server).
   skillet / cutting board totals (offline-friendly) and the Nourishment / Comfort / Garlic effect state,
   remaining time and total applications (online only).
 - New command `/pi pd [player]`; monthly reports gain a `附：插件数据（PlaceholderAPI，实时）` section
-  plus an `…-integrations.json` sidecar, both omitted when no data resolves.
+  (as of v2.2.0 no `-integrations.json` sidecar is written any more).
 - Fixed the 1.21.11 `plugin.yml` **`api-version`**, which held the plugin version string instead of a
   Minecraft API version (`2.1.0-1.21.11` → `1.21`).
 - Only the 1.21.11 build changes; the 1.12.2 build stays at 2.1.0.
@@ -361,8 +412,7 @@ Where the data shows up:
 
 - `/pi pd [player]` prints the resolved values in game (no argument = yourself).
 - Monthly player reports get an extra section `## 附：插件数据（PlaceholderAPI，实时）` right before the
-  closing footer, plus a machine-readable `…-integrations.json` sidecar. Both are omitted entirely when
-  nothing resolves.
+  closing footer. It is omitted entirely when nothing resolves (v2.2.0 removed the `…-integrations.json` sidecar).
 
 These numbers are the plugin's own **lifetime counters**, so they are *not* a replay of the monthly
 JSONL and do not change when you run `/pi gen`. They are only resolved for players the server still has
@@ -375,7 +425,6 @@ integrations:
   placeholderapi:
     enabled: true
     report-section: true
-    export-json: true
     papersdelight:
       enabled: true
     slimefun:

@@ -62,8 +62,8 @@ foreach ($f in $guard.Keys) {
 }
 
 # 3) 编译打包
-Build $v12 $javac11 $jar11 $cp12 "PlayerInsight-2.1.2-1.12.2.jar"
-Build $v21 $javac21 $jar21 $cp21 "PlayerInsight-2.1.2-1.21.11.jar"
+Build $v12 $javac11 $jar11 $cp12 "PlayerInsight-2.2.0-1.12.2.jar"
+Build $v21 $javac21 $jar21 $cp21 "PlayerInsight-2.2.0-1.21.11.jar"
 
 # 4) 一致性回放
 & $javac11 -encoding UTF-8 -classpath $cp12 -d "$root\tests" "$root\tests\ReplayHarness.java"

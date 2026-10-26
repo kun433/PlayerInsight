@@ -25,12 +25,16 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -155,9 +159,20 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
     private int moveIntervalSeconds = 5;
     private boolean moveOnlyWhenMoved = true;
 
-    // 导出
-    private boolean exportJson = true;
-    private boolean exportCsv = true;
+    /**
+     * 方块破坏前的材质快照（LOWEST 阶段写入、MONITOR 阶段消费）。
+     *
+     * <p>有些连锁挖掘插件（Veinminer 一类的实现）会先把方块置为 AIR 再派发事件，
+     * 或者由其它插件先行销毁方块；此时 MONITOR 阶段读到的类型已经是 AIR，
+     * 直接用快照里的真实材质，避免“挖了矿却记成 AIR”甚至统计不到矿物。
+     */
+    private final Map<String, Material> breakSnapshots = new ConcurrentHashMap<String, Material>();
+
+    /** 本次运行期间由连锁挖掘事件（Veinminer 等）记录下来的方块数，仅供 /pi status 观察。 */
+    private final AtomicLong veinBreaks = new AtomicLong();
+
+    /** 启动时是否清理“当时没有任何玩家记录”的历史报告。 */
+    private boolean cleanupEmptyReports = true;
 
     // 轨迹日志 / 定时心跳（参考 PlayerMoveLog）
     private TrailLog trail;
@@ -281,6 +296,20 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
             }
         }, 600L, checkTicks);
 
+        if (this.cleanupEmptyReports) {
+            // 启动后延迟 10 秒，在不影响开服的前提下清掉历史上“没有任何玩家”的空报告
+            Bukkit.getScheduler().runTaskLater(this, new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        cleanupEmptyReports(null);
+                    } catch (Throwable t) {
+                        getLogger().warning("PlayerInsight: 清理空报告失败: " + t.getMessage());
+                    }
+                }
+            }, 200L);
+        }
+
         getLogger().info("PlayerInsight 已启用（" + Compat.MINECRAFT_VERSION + " 版，" + Compat.PLATFORM_NOTE
                 + "）。数据目录: " + getDataFolder().getAbsolutePath());
         if (this.integrations != null) {
@@ -343,8 +372,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         this.moveIntervalSeconds = Math.max(1, getConfig().getInt("move-log.interval-seconds", 5));
         this.moveOnlyWhenMoved = getConfig().getBoolean("move-log.only-when-moved", true);
 
-        this.exportJson = getConfig().getBoolean("export.json", true);
-        this.exportCsv = getConfig().getBoolean("export.csv", true);
+        this.cleanupEmptyReports = getConfig().getBoolean("cleanup-empty-reports", true);
 
         // ===== 轨迹日志 / 定时心跳 =====
         this.trailEnabled = getConfig().getBoolean("trail-log.enabled", true);
@@ -984,12 +1012,42 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
 
     // ================= 方块 =================
 
+    /**
+     * 在事件链最前面把方块真实材质记下来。
+     *
+     * <p>正常原版挖掘用不到它；它的作用是在“方块已被置空但事件刚刚派发”的场景
+     * （Veinminer 等连锁挖掘插件、或其它先置空再派发事件的插件）里保住材质信息。
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onBlockBreakCapture(BlockBreakEvent e) {
+        if (!this.recBlocks) {
+            return;
+        }
+        Material material = e.getBlock().getType();
+        if (material == Material.AIR) {
+            return;
+        }
+        if (this.breakSnapshots.size() > 4096) {
+            this.breakSnapshots.clear();
+        }
+        this.breakSnapshots.put(blockKey(e.getBlock()), material);
+    }
+
+    private static String blockKey(org.bukkit.block.Block block) {
+        return block.getWorld().getName() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent e) {
         if (!this.recBlocks) {
             return;
         }
         Material material = e.getBlock().getType();
+        Material captured = this.breakSnapshots.remove(blockKey(e.getBlock()));
+        if (material == Material.AIR && captured != null) {
+            // 方块在事件派发前已被置空（连锁挖掘 / 其它插件代为破坏）：补齐真实材质
+            material = captured;
+        }
         JsonObject o = store.newEvent("BLOCK", System.currentTimeMillis());
         o.addProperty("action", "BREAK");
         o.addProperty("name", e.getPlayer().getName());
@@ -1025,6 +1083,15 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         }
         if (this.blockLight) {
             o.addProperty("light", e.getBlock().getLightLevel());
+        }
+        String eventClass = e.getClass().getName();
+        if (!"org.bukkit.event.block.BlockBreakEvent".equals(eventClass)) {
+            // 不是原版直接派发的事件：多半是连锁挖掘插件为单个方块派发的子类事件
+            o.addProperty("via", e.getClass().getSimpleName());
+            if (eventClass.toLowerCase(Locale.ROOT).contains("vein")) {
+                o.addProperty("vein", true);
+                this.veinBreaks.incrementAndGet();
+            }
         }
         store.append(e.getPlayer().getUniqueId().toString(), currentMonth(), o);
     }
@@ -1759,15 +1826,14 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
     private void generateDailyReport(LocalDate day) {
         store.flushAll();
         LinkedHashMap<String, PlayerStats> byPlayer = collectDayStats(day);
+        if (byPlayer.isEmpty()) {
+            // 当天没有任何玩家留下记录：不生成文件（连空的 md 也不写）
+            getLogger().info("PlayerInsight: " + day + " 没有任何玩家记录，跳过日报生成。");
+            return;
+        }
         String md = DailyReportGenerator.generate(day, byPlayer);
         File base = new File(getDataFolder(), "reports/daily");
         writeReport(new File(base, day + "-all-players.md"), md);
-        if (this.exportJson) {
-            writeReport(new File(base, day + "-all-players.json"), DataExport.dailyJson(day, byPlayer));
-        }
-        if (this.exportCsv) {
-            writeReport(new File(base, day + "-all-players.csv"), DataExport.dailyCsv(day, byPlayer));
-        }
         getLogger().info("PlayerInsight: 已生成 " + day + " 日报（" + byPlayer.size() + " 名玩家）。");
     }
 
@@ -1787,15 +1853,10 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
             PluginData pluginData = integrationData(name);
             writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-report.md"),
                     ReportGenerator.generate(stats, perDay, pluginData.markdown()));
-            writeIntegrationJson(new File(getDataFolder(), "reports/monthly"), name + "-" + yyyyMM, pluginData);
-            if (this.exportJson) {
-                writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-summary.json"),
-                        DataExport.monthlyJson(stats));
-            }
-            if (this.exportCsv) {
-                writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-blocks.csv"),
-                        DataExport.blocksCsv(stats));
-            }
+        }
+        if (byPlayer.isEmpty()) {
+            getLogger().info("PlayerInsight: " + yyyyMM + " 没有任何玩家记录，跳过月报生成。");
+            return;
         }
         writeReport(new File(getDataFolder(), "reports/monthly/" + yyyyMM + "-all-players.md"),
                 DailyReportGenerator.generatePeriod("服务器月度汇总 - " + yyyyMM, byPlayer));
@@ -2046,6 +2107,10 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         }
         if ("status".equals(sub)) {
             printStatus(sender);
+            return true;
+        }
+        if ("cleanup".equals(sub)) {
+            cleanupEmptyReports(sender);
             return true;
         }
         if ("blocks".equals(sub)) {
@@ -2372,6 +2437,11 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         sender.sendMessage("§7自动报告: 日报至 " + (this.lastDailyRun == null ? "未跑" : this.lastDailyRun)
                 + "，月报至 " + (this.lastMonthlyRun == null ? "未跑" : this.lastMonthlyRun)
                 + "，玩家记录至 " + (this.lastPlayerRecordRun == null ? "未跑" : this.lastPlayerRecordRun));
+        sender.sendMessage("§7输出: §f仅 Markdown（无 json/csv 边车文件）"
+                + "§7，无玩家记录时不生成报告");
+        boolean veinPlugin = Bukkit.getPluginManager().getPlugin("Veinminer") != null;
+        sender.sendMessage("§7连锁挖掘: " + (veinPlugin ? "§a已检测到 Veinminer" : "§7未检测到 Veinminer（其它连锁插件的事件同样兼得）")
+                + "§7，本次已逐块记录 §f" + this.veinBreaks.get() + " §7个方块");
     }
 
     private static String yn(boolean value) {
@@ -2405,6 +2475,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         sender.sendMessage("§a/pi stats [玩家] §7- 查看已记录玩家 / 玩家摘要");
         sender.sendMessage("§a/pi pd [玩家] §7- 查看插件数据（Paper's Delight / Slimefun 等，需 PlaceholderAPI）");
         sender.sendMessage("§a/pi gen <daily|monthly|records> [日期] §7- 手动重新生成报告");
+        sender.sendMessage("§a/pi cleanup §7- 清理“无玩家记录”的历史空报告");
         sender.sendMessage("§a/pi reload §7- 重载配置");
     }
 
@@ -2427,15 +2498,6 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         File out = new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-report.md");
         PluginData pluginData = integrationData(name);
         writeReport(out, ReportGenerator.generate(stats, perDay, pluginData.markdown()));
-        writeIntegrationJson(new File(getDataFolder(), "reports/monthly"), name + "-" + yyyyMM, pluginData);
-        if (this.exportJson) {
-            writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-summary.json"),
-                    DataExport.monthlyJson(stats));
-        }
-        if (this.exportCsv) {
-            writeReport(new File(getDataFolder(), "reports/monthly/" + name + "-" + yyyyMM + "-blocks.csv"),
-                    DataExport.blocksCsv(stats));
-        }
         return out;
     }
 
@@ -2465,12 +2527,120 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
         }
     }
 
-    /** 需要时写出插件联动的 JSON 边车文件（reports/monthly/<玩家>-<yyyy-MM>-integrations.json）。 */
-    private void writeIntegrationJson(File dir, String baseName, PluginData data) {
-        if (this.integrations == null || !this.integrations.isExportJson() || data == null || data.isEmpty()) {
-            return;
+    /**
+     * 清理“当时没有任何玩家记录却仍被生成”的历史报告。
+     *
+     * <p>v2.1.x 及以前无论有没人玩都会写一份空日报/空月度汇总（“活跃玩家 | 0”），
+     * 这些文件没有信息量。本方法只删“确认没有任何玩家记录”的聚合报告（md 及其同名 json/csv），
+     * 有数据的报告一律不动。返回删掉的文件个数；sender 为空时不输出指令消息。
+     */
+    private int cleanupEmptyReports(CommandSender sender) {
+        int removed = 0;
+        File dailyDir = new File(getDataFolder(), "reports/daily");
+        Set<String> days = new LinkedHashSet<String>();
+        File[] dailyFiles = dailyDir.listFiles();
+        if (dailyFiles != null) {
+            for (File f : dailyFiles) {
+                String n = f.getName();
+                int tag = n.indexOf("-all-players");
+                if (tag <= 0) {
+                    continue;
+                }
+                String date = n.substring(0, tag);
+                if (date.length() == 10 && date.charAt(4) == '-' && date.charAt(7) == '-') {
+                    days.add(date);
+                }
+            }
         }
-        writeReport(new File(dir, baseName + "-integrations.json"), data.toJson());
+        for (String date : days) {
+            boolean empty = isEmptyDailyReportSet(dailyDir, date);
+            if (!empty) {
+                continue;
+            }
+            removed += deleteReportSet(dailyDir, date + "-all-players");
+            if (sender != null) {
+                sender.sendMessage("§7[PI] 删除空日报: " + date + "-all-players");
+            }
+        }
+
+        File monthlyDir = new File(getDataFolder(), "reports/monthly");
+        File[] monthlyFiles = monthlyDir.listFiles();
+        if (monthlyFiles != null) {
+            for (File f : monthlyFiles) {
+                String n = f.getName();
+                int tag = n.indexOf("-all-players");
+                if (tag <= 0) {
+                    continue;
+                }
+                String month = n.substring(0, tag);
+                if (month.length() != 7 || month.charAt(4) != '-') {
+                    continue;
+                }
+                File md = new File(monthlyDir, month + "-all-players.md");
+                boolean empty = md.isFile() && isEmptyAggregateReport(md);
+                if (!empty) {
+                    continue;
+                }
+                removed += deleteReportSet(monthlyDir, month + "-all-players");
+                if (sender != null) {
+                    sender.sendMessage("§7[PI] 删除空月度汇总: " + month + "-all-players");
+                }
+            }
+        }
+        if (removed > 0) {
+            getLogger().info("PlayerInsight: 已清理 " + removed + " 个无玩家的历史报告文件。");
+        }
+        if (sender != null) {
+            sender.sendMessage(removed > 0
+                    ? "§a[PI] 已清理 " + removed + " 个没有玩家记录的报告文件。"
+                    : "§a[PI] 没有发现需要清理的空报告。");
+        }
+        return removed;
+    }
+
+    /**
+     * 某天的日报是不是“没有玩家”的空报告：先看 md 里的“活跃玩家 0”，
+     * 再看同名 json 的 playerCount（旧版导出文件）。不做日志回放，避免启动时扫盘。
+     */
+    static boolean isEmptyDailyReportSet(File dir, String date) {
+        File md = new File(dir, date + "-all-players.md");
+        if (md.isFile()) {
+            return isEmptyAggregateReport(md);
+        }
+        return fileContains(new File(dir, date + "-all-players.json"), "\"playerCount\":0");
+    }
+
+    private static boolean fileContains(File f, String needle) {
+        if (!f.isFile()) {
+            return false;
+        }
+        try {
+            return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).contains(needle);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** 聚合报告里“活跃玩家 | 0”代表当天/当月没有任何玩家记录。 */
+    static boolean isEmptyAggregateReport(File md) {
+        try {
+            String text = new String(Files.readAllBytes(md.toPath()), StandardCharsets.UTF_8);
+            return text.contains("| 活跃玩家 | 0 |");
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** 删掉某个报告基名的 md / json / csv 三件套，返回真正删掉的个数。 */
+    static int deleteReportSet(File dir, String baseName) {
+        int removed = 0;
+        for (String ext : new String[]{".md", ".json", ".csv"}) {
+            File f = new File(dir, baseName + ext);
+            if (f.isFile() && f.delete()) {
+                removed++;
+            }
+        }
+        return removed;
     }
 
     private void printPlayerSummary(CommandSender sender, String target) {
@@ -2586,6 +2756,7 @@ public final class PlayerInsight extends JavaPlugin implements Listener {
             out.add("status");
             out.add("stats");
             out.add("gen");
+            out.add("cleanup");
             out.add("reload");
             out.add("help");
         } else if (args.length == 2) {
