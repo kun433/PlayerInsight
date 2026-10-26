@@ -11,12 +11,8 @@
 | `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
 | `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
 
-v2.2.0 两个构建同步改动：
-
-1. **没有玩家就不生成报告。** 某天/某月没有任何玩家记录时，不再写出空报告（以前每天都写一份“活跃玩家 0”）。
-2. **只生成 Markdown。** 日报/月报不再输出 json、csv 与 `-integrations.json` 边车文件。
-3. **清理历史空报告。** 启动时扫描 `reports/`，删掉内容为“活跃玩家 0”的聚合报告；`/pi cleanup` 可手动重跑。
-4. **适配 Veinminer（连锁挖矿）。** 连锁破坏的每个方块都会被逐块记录，即使某个插件在派发事件前已把方块置空，也能保住真实材质（见第 3.1 节）。
+报告只输出 Markdown；某天/某月没有任何玩家记录时不会生成文件（见第四节）。
+Veinminer 这类连锁挖矿插件会逐块记录（见第 3.1 节）。
 
 两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
 只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
@@ -216,22 +212,6 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 8. 中文聊天增加二字组合分词，高频词表对中文服务器才有意义。
 9. 新增 `players.yml` 玩家索引与历史日志补全，离线玩家可查、可读。
 10. 兼容 v1 的旧日志（包括旧版把拾取/丢弃/食用写成 `BLOCK` 事件的情况）。
-
-### v2.2.0 更新：无玩家不生成、只出 md、适配 Veinminer
-
-- **没有玩家就不生成报告**：`generateDailyReport` / `generateMonthlyReportsFor` 在聚合结果为空时直接返回，
-  某天/某月没有任何玩家记录就不写任何文件；日志会打印 `跳过日报生成` / `跳过月报生成`。
-- **只生成 Markdown**：写入路径里删掉了 JSON / CSV 导出与 `-integrations.json` 边车文件，`export.*` 配置项一并移除；
-  `DataExport` 类保留（离线回放测试 `ReplayHarness` 还在用）。
-- **清理历史空报告**：新增 `cleanupEmptyReports()`，扫描 `reports/daily/*-all-players.*` 与 `reports/monthly/*-all-players.*`，
-  正文含 `| 活跃玩家 | 0 |` 的视为空报告，连它的 `.md` / `.json` / `.csv` 一起删掉；启动 10 秒后自动跑一次
-  （配置 `cleanup-empty-reports`），也可用 `/pi cleanup` 手动重跑。有数据的报告一律不动。
-- **适配 Veinminer（连锁挖矿）**：`LOWEST` 优先级的 `BlockBreakEvent` 监听器先把方块真实材质存成快照，
-  `MONITOR` 阶段发现方块已是 `AIR` 时用快照补齐，避免连锁挖掘插件先置空再派发事件时丢材质；
-  以 `BlockBreakEvent` 子类形式到来的破坏（Veinminer 自己的 `VeinminerEvent`，或其它连锁挖掘插件）
-  会在原始日志里标记 `via` + `vein: true` 并正常计入挖掘，不会被丢弃。
-  `/pi status` 显示是否检测到 Veinminer 与本次已记录的连锁方块数；月报「挖掘明细」与日报总览会在数量不为 0 时多一行“连锁挖掘”。
-- 新增离线测试 `tests/CleanupTest.java`（空报告识别与删除集合共 9 条断言）。
 
 ### v2.1.2 更新（2026-09-28）：适配 Slimefun（粘液科技）
 

@@ -12,16 +12,8 @@ The same feature set is built as two separate artifacts:
 | `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
 | `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
 
-v2.2.0 changes both builds:
-
-1. **No players, no report.** A day or month with nothing recorded for any player no longer produces
-   an empty report file at all (previously it wrote a “0 active players” report every day).
-2. **Markdown only.** The plugin now writes only `.md` files: the JSON/CSV daily and monthly exports and
-   the `-integrations.json` sidecar are gone.
-3. **Historical empty reports are cleaned up.** On startup the plugin scans `reports/` and deletes the
-   aggregate reports whose content shows “0 active players”; `/pi cleanup` reruns it manually.
-4. **Veinminer compatibility.** Vein chain-breaking is recorded block by block, and a block that another
-   plugin destroyed before the event is still attributed to its real material (see section 3.1).
+Reports are Markdown only; a day or month in which no player left any record produces no file at all
+(see section 4). Chain-mining plugins such as Veinminer are recorded block by block (see section 3.1).
 
 Both builds share identical events, data structures and report formats (the same `PlayerStats` /
 `ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
@@ -234,27 +226,6 @@ against a real server).
 8. Chinese chat gained two-character bigram tokenisation; the frequent-word tables only make sense on Chinese servers.
 9. New `players.yml` player index with historical backfill, so offline players can be queried and read.
 10. Compatible with v1 logs (including the old version writing pickups/drops/eating as `BLOCK` events).
-
-### v2.2.0 update: no player no report, Markdown only, Veinminer support
-
-- **No players, no report.** `generateDailyReport` / `generateMonthlyReportsFor` now return early when the
-  aggregation is empty, so a day or month without any player record writes nothing. The log line says
-  `跳过日报生成` / `跳过月报生成` instead.
-- **Markdown only.** The JSON/CSV exports and the `-integrations.json` sidecar were removed from the write
-  path; the `export.*` config section is gone. `DataExport` is kept because the offline replay harness still uses it.
-- **Legacy empty reports are cleaned up.** New `cleanupEmptyReports()` scans `reports/daily/*-all-players.*`
-  and `reports/monthly/*-all-players.*`; a report whose body contains `| 活跃玩家 | 0 |` is treated as empty and
-  its `.md` / `.json` / `.csv` trio is deleted. It runs 10 s after startup (config `cleanup-empty-reports`)
-  and can be re-run with `/pi cleanup`. Reports that contain data are never touched.
-- **Veinminer compatibility.** A `LOWEST`-priority `BlockBreakEvent` listener snapshots the real material of
-  each broken block; the `MONITOR` handler falls back to that snapshot when the block already reads as `AIR`,
-  so chain-mining plugins that clear the block before firing the event can no longer lose the material.
-  Breaks delivered through a `BlockBreakEvent` subclass (Veinminer's own `VeinminerEvent`, or any other
-  chain-mining plugin) are tagged `via` + `vein: true` in the raw log instead of being dropped, and are
-  counted as ordinary mined blocks. `/pi status` shows whether Veinminer is installed and how many vein
-  blocks this session has recorded; monthly reports and the daily overview add a “chain-mined” line when
-  the count is non-zero.
-- New offline test `tests/CleanupTest.java` (9 assertions on empty-report detection and the delete set).
 
 ### v2.1.2 update (2026-09-28): adapted to Slimefun
 
