@@ -1,24 +1,30 @@
-# PlayerInsight v2.2.0 — Detailed Player Activity Logging Plugin
+# PlayerInsight v2.3.0 — Detailed Player Activity Logging Plugin
 
 [English](README.md) | [中文](README.zh-CN.md)
 
 Records what every player does on your server and turns those records into reports that are
 **readable by humans and directly consumable by AI**.
 
-The same feature set is built as two separate artifacts:
+The same feature set is built as three separate artifacts:
 
 | Build | Target platform | Bytecode | Artifact |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.3.0-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.3.0-1.21.11.jar` |
+| `26.3/` | Paper 26.3 (Java 25 minimum) | Java 25 | `dist/PlayerInsight-2.3.0-26.3.jar` |
 
 Reports are Markdown only; a day or month in which no player left any record produces no file at all
 (see section 4). Chain-mining plugins such as Veinminer are recorded block by block (see section 3.1).
 
-Both builds share identical events, data structures and report formats (the same `PlayerStats` /
+All three builds share identical events, data structures and report formats (the same `PlayerStats` /
 `ReportGenerator` code). Only version-specific parts differ: the chat event (1.12.2 uses
-`AsyncPlayerChatEvent`, 1.21.11 uses `AsyncChatEvent` + Adventure), block state strings (data values
+`AsyncPlayerChatEvent`, 1.21.11 and 26.3 use `AsyncChatEvent` + Adventure), block state strings (data values
 vs. block states), player ping / client brand, the server's native statistic names, and swimming / riptide state.
+
+The 26.3 and 1.21.11 sources are byte-for-byte identical apart from `Compat.java`, `plugin.yml`
+(`api-version: '26.3'`) and the build script; the difference is that 26.3 targets the Paper 26.3 API
+(Adventure 5.x) with Java 25 bytecode. The 26.3 jar therefore loads only on 26.3 or newer servers, and
+the 1.21.11 jar will not load on 26.3.
 
 ---
 
@@ -191,13 +197,21 @@ Each version directory contains a `build.ps1` (uses only `javac` + `jar`; no Mav
 ```powershell
 cd 1.12.2 ; .\build.ps1      # requires JDK 11 (--release 8)
 cd 1.21.11 ; .\build.ps1     # requires JDK 21 (--release 21)
+cd 26.3 ; .\build.ps1        # requires JDK 25 (--release 25); set PI_JDK if jdk-25 is not under Program Files\Java
 ```
 
 Dependencies (shipped with the project, under each version's `lib/`):
 
 - 1.12.2: `paper-api-1.12.2.jar`, `bungeecord-chat.jar`
 - 1.21.11: `paper-api-1.21.11.jar`, `adventure-api/key/text-serializer-plain`, `examination-api`, `bungeecord-chat-1.21.jar`
+- 26.3: `paper-api-26.3.jar` (Paper switched the 26.x API to build-numbered versions such as
+  `26.3.build.241-stable`), `adventure-api/key/text-serializer-plain` 5.2.0, `annotations-26.0.2`,
+  `guava-33.6.0-jre`, `bungeecord-chat-1.21.jar`
 - `shaded/`: relocated Gson (`com.playerinsight.lib.gson`), packaged into the jar so it cannot conflict with other plugins.
+
+`tests\build-all.ps1` rebuilds all three artifacts and runs the consistency replay: it syncs the shared
+sources, enforces per-version guards, then replays one log file through all three builds and compares
+the generated reports line by line.
 
 ## 8. Offline replay tests
 
@@ -211,8 +225,8 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 ```
 
 `tests/smoke-test.ps1` actually starts a Paper server in an isolated directory and checks plugin
-loading, event registration, `/pi` commands and report generation (both builds have been verified
-against a real server).
+loading, event registration, `/pi` commands and report generation (the 1.12.2 and 1.21.11 builds were
+verified against a real server; the 26.3 build has only been compile- and replay-verified so far).
 
 ## 9. What changed from v1 to v2
 

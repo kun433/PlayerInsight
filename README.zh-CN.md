@@ -1,22 +1,27 @@
-# PlayerInsight v2.2.0 — 详细玩家行为记录插件
+# PlayerInsight v2.3.0 — 详细玩家行为记录插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
 记录服务器里每位玩家的行为，并把记录整理成**人看得懂、AI 也能直接读**的报告。
 
-同一套功能做成两个互不相同的构建：
+同一套功能做成三个互不相同的构建：
 
 | 构建 | 目标平台 | 字节码 | 产物 |
 | --- | --- | --- | --- |
-| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.2.0-1.12.2.jar` |
-| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.2.0-1.21.11.jar` |
+| `1.12.2/` | Paper / Spigot 1.12.2 | Java 8 | `dist/PlayerInsight-2.3.0-1.12.2.jar` |
+| `1.21.11/` | Paper 1.21.x | Java 21 | `dist/PlayerInsight-2.3.0-1.21.11.jar` |
+| `26.3/` | Paper 26.3（最低 Java 25） | Java 25 | `dist/PlayerInsight-2.3.0-26.3.jar` |
 
 报告只输出 Markdown；某天/某月没有任何玩家记录时不会生成文件（见第四节）。
 Veinminer 这类连锁挖矿插件会逐块记录（见第 3.1 节）。
 
-两版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
-只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 用 `AsyncChatEvent` + Adventure）、
+三版的事件、数据结构、报告格式完全一致（同一个 `PlayerStats` / `ReportGenerator` 代码），
+只有版本相关的地方不同：聊天事件（1.12.2 用 `AsyncPlayerChatEvent`，1.21.11 与 26.3 用 `AsyncChatEvent` + Adventure）、
 方块状态字符串（data 值 vs 方块状态）、玩家延迟/客户端品牌、服务器原生统计项名、游泳/激流状态。
+
+26.3 与 1.21.11 的源码逐字相同，只有 `Compat.java`、`plugin.yml`（`api-version: '26.3'`）和构建脚本不同；
+区别只在于 26.3 用 Paper 26.3 的 API（Adventure 5.x）和 Java 25 字节码，所以 26.3 的 jar 只能装进
+26.3 及更新的服务端，1.21.11 的 jar 则装不进 26.3。
 
 ---
 
@@ -178,13 +183,19 @@ plugins/PlayerInsight/
 ```powershell
 cd 1.12.2 ; .\build.ps1      # 需要 JDK 11（--release 8）
 cd 1.21.11 ; .\build.ps1     # 需要 JDK 21（--release 21）
+cd 26.3 ; .\build.ps1        # 需要 JDK 25（--release 25），找不到 jdk-25 时可用 PI_JDK 指定
 ```
 
 依赖（已随项目提供，放在各版本的 `lib/`）：
 
 - 1.12.2：`paper-api-1.12.2.jar`、`bungeecord-chat.jar`
 - 1.21.11：`paper-api-1.21.11.jar`、`adventure-api/key/text-serializer-plain`、`examination-api`、`bungeecord-chat-1.21.jar`
+- 26.3：`paper-api-26.3.jar`（Paper 26.3 起 API 改成带构建号的版本，如 `26.3.build.241-stable`）、
+  `adventure-api/key/text-serializer-plain` 5.2.0、`annotations-26.0.2`、`guava-33.6.0-jre`、`bungeecord-chat-1.21.jar`
 - `shaded/`：已重定位的 Gson（`com.playerinsight.lib.gson`），打包进 jar，避免与其它插件冲突。
+
+一键重建三版并做一致性回放：`tests\build-all.ps1`（会先同步共享源码，再做完整性守卫，
+最后用同一份日志回放三个构建并逐行比对报告）。
 
 ## 八、离线回放测试
 
@@ -198,7 +209,7 @@ $cp = "1.12.2\build\classes;1.12.2\shaded;1.12.2\lib\paper-api-1.12.2.jar;1.12.2
 ```
 
 `tests/smoke-test.ps1` 会在隔离目录里真的启动一个 Paper 服务器，检查插件加载、
-事件注册、`/pi` 指令与报告生成（两版都已用真实服务器验证通过）。
+事件注册、`/pi` 指令与报告生成（1.12.2 与 1.21.11 两版已用真实服务器验证通过；26.3 版只做了编译与离线回放验证）。
 
 ## 九、v2 相对 v1 的变化
 

@@ -6,15 +6,20 @@
 #   4) PluginData 的 Markdown / JSON / 指令行渲染
 #   5) 报告章节只在其有数据时追加，未启用联动时报告与旧版逐行一致
 #
-# 用法：在 PowerShell 中执行  .\integration-test.ps1
-# 需要：JDK 21（与 1.21.11 构建一致）；先跑过 1.21.11\build.ps1
+# 用法：在 PowerShell 中执行  .\integration-test.ps1 [ -Module 26.3 ]
+# 需要：与该构建匹配的 JDK（1.21.11 → JDK 21，26.3 → JDK 25）；先跑过对应目录的 build.ps1
+param(
+    [string]$Module = "26.3"
+)
 $ErrorActionPreference = "Stop"
 
 $testsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $root = Split-Path -Parent $testsDir
-$module = Join-Path $root "1.21.11"
+$moduleDir = Join-Path $root $Module
 
-$jdk = "C:\Program Files\Java\jdk-21"
+# 26.x 起需要 JDK 25，1.21.x 用 JDK 21
+$jdkName = if ($Module -match '^1\.') { "jdk-21" } else { "jdk-25" }
+$jdk = "C:\Program Files\Java\$jdkName"
 $javac = "$jdk\bin\javac.exe"
 $java = "$jdk\bin\java.exe"
 if (-not (Test-Path $javac)) {
@@ -22,15 +27,15 @@ if (-not (Test-Path $javac)) {
     $java = "java"
 }
 
-$classes = Join-Path $module "build\classes"
+$classes = Join-Path $moduleDir "build\classes"
 if (-not (Test-Path $classes)) {
-    Write-Host "缺少 $classes，请先在 1.21.11 目录执行 .\build.ps1" -ForegroundColor Red
+    Write-Host "缺少 $classes，请先在 $Module 目录执行 .\build.ps1" -ForegroundColor Red
     exit 1
 }
 
-$libs = (Get-ChildItem (Join-Path $module "lib") -Filter *.jar | ForEach-Object { $_.FullName }) -join ";"
-$classpath = "$classes;" + (Join-Path $module "shaded") + ";$libs"
-$outDir = Join-Path $testsDir "out\it"
+$libs = (Get-ChildItem (Join-Path $moduleDir "lib") -Filter *.jar | ForEach-Object { $_.FullName }) -join ";"
+$classpath = "$classes;" + (Join-Path $moduleDir "shaded") + ";$libs"
+$outDir = Join-Path $testsDir "out\it-$Module"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Write-Host "== 编译测试 =="
